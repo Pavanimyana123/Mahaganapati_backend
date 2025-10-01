@@ -6,17 +6,17 @@ const router = express.Router();
 // Get last invoice number
 router.get("/lastInvoiceNumber", async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT invoice_number FROM sale_details WHERE invoice_number LIKE 'INV%' ORDER BY id DESC");
+    const [rows] = await db.query("SELECT invoice_number FROM sale_details WHERE invoice_number LIKE 'SMJ%' ORDER BY id DESC");
     if (rows.length > 0) {
       const invNumbers = rows
         .map(r => r.invoice_number)
-        .filter(inv => inv.startsWith("INV"))
+        .filter(inv => inv.startsWith("SMJ"))
         .map(inv => parseInt(inv.slice(3), 10));
       const lastInvoiceNumber = Math.max(...invNumbers);
-      const nextInvoiceNumber = `INV${String(lastInvoiceNumber + 1).padStart(3, "0")}`;
+      const nextInvoiceNumber = `SMJ${String(lastInvoiceNumber + 1).padStart(3, "0")}`;
       res.json({ lastInvoiceNumber: nextInvoiceNumber });
     } else {
-      res.json({ lastInvoiceNumber: "INV001" });
+      res.json({ lastInvoiceNumber: "SMJ001" });
     }
   } catch (err) {
     console.error("Error fetching last invoice number:", err);
@@ -55,10 +55,10 @@ router.post("/convert-order", async (req, res) => {
     if (!orderDetails.length) return res.status(404).json({ success: false, message: "Order not found" });
 
     const [lastInvoiceRows] = await db.query("SELECT invoice_number FROM sale_details ORDER BY invoice_number DESC LIMIT 1");
-    let nextInvoiceNumber = "INV001";
+    let nextInvoiceNumber = "SMJ001";
     if (lastInvoiceRows.length > 0 && lastInvoiceRows[0].invoice_number) {
       const invNum = parseInt(lastInvoiceRows[0].invoice_number.slice(3), 10) + 1;
-      nextInvoiceNumber = `INV${String(invNum).padStart(3, "0")}`;
+      nextInvoiceNumber = `SMJ${String(invNum).padStart(3, "0")}`;
     }
 
     await db.query(

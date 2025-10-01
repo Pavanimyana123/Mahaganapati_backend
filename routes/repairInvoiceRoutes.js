@@ -13,12 +13,12 @@ router.post('/convert-repair', async (req, res) => {
       'SELECT invoice_number FROM repair_details ORDER BY invoice_number DESC LIMIT 1'
     );
 
-    let nextInvoiceNumber = 'INV001';
+    let nextInvoiceNumber = 'SMJ001';
 
     if (lastInvoiceResult.length > 0 && lastInvoiceResult[0].invoice_number) {
       const last = lastInvoiceResult[0].invoice_number.slice(3);
       const next = parseInt(last, 10) + 1;
-      nextInvoiceNumber = `INV${String(next).padStart(3, '0')}`;
+      nextInvoiceNumber = `SMJ${String(next).padStart(3, '0')}`;
     }
 
     // 2. Format date and time
