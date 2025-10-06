@@ -441,18 +441,18 @@ async function handleOpeningTagsEntry(items, invoiceNumber) {
                 // Insert into opening_tags_entry - FIXED: Added missing comma after PCode_BarCode
                 const [opentagResult] = await db.execute(`
                     INSERT INTO opening_tags_entry (
-                        product_id, sub_category, Pricing, metal_type, Purity, PCode_BarCode,
+                        product_id, sub_category, Pricing, metal_type, Purity,
                         Gross_Weight, Stones_Weight, Weight_BW, Wastage_On, Wastage_Percentage, WastageWeight, 
                         TotalWeight_AW, MC_Per_Gram, Making_Charges_on, Making_Charges, Stones_Price, design_master, 
                         category, pieace_cost, pcs, Status
-                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     item.product_id || null,
                     item.product_name || null,
                     item.pricing || null,
                     item.metal_type || null,
                     item.purity || null,
-                    item.code || null,
+                    // item.code || null,
                     sanitizeNumeric(item.gross_weight),
                     sanitizeNumeric(item.stone_weight),
                     sanitizeNumeric(item.weight_bw),
