@@ -123,7 +123,7 @@ router.delete('/delete/products/:product_id', async (req, res) => {
 });
 
 router.post('/api/check-and-insert', async (req, res) => {
-  const { product_name, Category, purity, design_master } = req.body;
+  const { product_name, Category, purity } = req.body;
 
   if (!product_name || !Category || !purity) {
     return res.status(400).json({ error: 'All fields are required.' });
@@ -136,20 +136,18 @@ router.post('/api/check-and-insert', async (req, res) => {
     );
 
     if (existingProducts.length > 0) {
+      // Product exists — no insertion here
       return res.json({ exists: true, message: 'Product already exists!' });
     }
 
-    const [result] = await db.query(
-      `INSERT INTO product (product_name, Category, design_master, purity) VALUES (?, ?, ?, ?)`,
-      [product_name, Category, design_master, purity]
-    );
-
-    res.status(201).json({ exists: false, message: 'Product saved successfully!', product_id: result.insertId });
+    // Product does not exist
+    return res.json({ exists: false, message: 'Product does not exist.' });
   } catch (err) {
     console.error('Error in product operation:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 router.get('/last-rbarcode', async (req, res) => {
   try {

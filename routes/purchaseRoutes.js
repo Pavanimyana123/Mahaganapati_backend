@@ -109,9 +109,9 @@ router.delete('/delete-purchases/:id', async (req, res) => {
       SELECT product_id, pcs, gross_weight 
       FROM purchases 
       WHERE id = ?`;
-    
+
     const [purchaseResults] = await db.execute(getPurchaseDetailsQuery, [id]);
-    
+
     if (purchaseResults.length === 0) {
       return res.status(404).json({ message: 'Purchase not found' });
     }
@@ -155,9 +155,9 @@ router.delete('/deletepurchases/:invoice', async (req, res) => {
       SELECT product_id, pcs, gross_weight 
       FROM purchases 
       WHERE invoice = ?`;
-    
+
     const [purchaseResults] = await db.execute(getPurchaseDetailsQuery, [invoice]);
-    
+
     if (purchaseResults.length === 0) {
       return res.status(404).json({ message: 'Purchase not found' });
     }
@@ -198,11 +198,11 @@ router.get('/purchase/:id', async (req, res) => {
   try {
     const query = 'SELECT * FROM purchases WHERE id = ?';
     const [results] = await db.execute(query, [id]);
-    
+
     if (results.length === 0) {
       return res.status(404).json({ message: 'Purchase not found' });
     }
-    
+
     res.status(200).json(results[0]);
   } catch (error) {
     console.error('Error fetching purchase:', error.message);
@@ -303,9 +303,9 @@ router.get("/get-purchase-details/:invoice", async (req, res) => {
       FROM purchases
       WHERE invoice = ?
     `;
-    
+
     const [results] = await db.execute(sql, [invoice]);
-    
+
     if (results.length === 0) {
       return res.status(404).json({ message: "No data found for the given invoice number" });
     }
@@ -327,7 +327,7 @@ router.get("/get-purchase-details/:invoice", async (req, res) => {
       overall_bal_wt: results[0].overall_bal_wt,
       overall_taxableAmt: results[0].overall_taxableAmt,
       overall_taxAmt: results[0].overall_taxAmt,
-      overall_netAmt: results[0].overall_netAmt, 
+      overall_netAmt: results[0].overall_netAmt,
       overall_hmCharges: results[0].overall_hmCharges
     };
 
@@ -387,7 +387,7 @@ router.get("/get-purchase-details/:invoice", async (req, res) => {
       other_charges: row.other_charges,
       overall_taxableAmt: row.overall_taxableAmt,
       overall_taxAmt: row.overall_taxAmt,
-      overall_netAmt: row.overall_netAmt, 
+      overall_netAmt: row.overall_netAmt,
       overall_hmCharges: row.overall_hmCharges,
       tag_id: row.tag_id,
       discount_amt: row.discount_amt,
@@ -754,5 +754,31 @@ const insertStoneDetails = async (stoneData) => {
   const [result] = await db.execute(query, values);
   return result;
 };
+
+router.get("/lastPurchaseInvoiceNumber", async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      "SELECT invoice FROM purchases WHERE invoice LIKE 'PINV%' ORDER BY id DESC"
+    );
+
+    if (rows.length > 0) {
+      const invNumbers = rows
+        .map(r => r.invoice)
+        .filter(inv => inv.startsWith("PINV"))
+        .map(inv => parseInt(inv.slice(4), 10)) // <-- FIX HERE: slice(4)
+
+      const lastInvoiceNumber = Math.max(...invNumbers);
+      const nextInvoiceNumber = `PINV${String(lastInvoiceNumber + 1).padStart(3, "0")}`;
+
+      res.json({ lastInvoiceNumber: nextInvoiceNumber });
+    } else {
+      res.json({ lastInvoiceNumber: "PINV001" });
+    }
+  } catch (err) {
+    console.error("Error fetching last invoice number:", err);
+    res.status(500).json({ error: "Failed to fetch last invoice number" });
+  }
+});
+
 
 module.exports = router;
