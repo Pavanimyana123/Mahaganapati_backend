@@ -27,7 +27,7 @@ router.post("/add/estimate", async (req, res) => {
         UPDATE estimate SET
           date=?, pcode=?, code=?, product_id=?, product_name=?, metal_type=?, design_name=?,
           purity=?, category=?, sub_category=?, gross_weight=?, stone_weight=?, stone_price=?,
-          weight_bw=?, va_on=?, va_percent=?, wastage_weight=?, total_weight_av=?,
+          weight_bw=?, va_on=?, va_percent=?, wastage_weight=?, msp_va_percent=?, msp_wastage_weight=?, total_weight_av=?,
           mc_on=?, mc_per_gram=?, making_charges=?, rate=?, rate_amt=?, tax_percent=?,
           tax_amt=?, total_price=?, pricing=?, pieace_cost=?, disscount_percentage=?,
           disscount=?, hm_charges=?, total_amount=?, taxable_amount=?, tax_amount=?, net_amount=?,
@@ -52,6 +52,8 @@ router.post("/add/estimate", async (req, res) => {
         sanitizeNumber(data.va_on),
         sanitizeNumber(data.va_percent),
         sanitizeNumber(data.wastage_weight),
+        sanitizeNumber(data.msp_va_percent),
+        sanitizeNumber(data.msp_wastage_weight),
         sanitizeNumber(data.total_weight_av),
         sanitizeNumber(data.mc_on),
         sanitizeNumber(data.mc_per_gram),
@@ -82,11 +84,11 @@ router.post("/add/estimate", async (req, res) => {
       const insertSql = `
         INSERT INTO estimate (
           date, pcode, estimate_number, code, product_id, product_name, metal_type, design_name, purity,
-          category, sub_category, gross_weight, stone_weight, stone_price, weight_bw, va_on, va_percent,
-          wastage_weight, total_weight_av, mc_on, mc_per_gram, making_charges, rate, rate_amt, tax_percent,
+          category, sub_category, gross_weight, stone_weight, stone_price, weight_bw, va_on, va_percent, wastage_weight, 
+          msp_va_percent, msp_wastage_weight, total_weight_av, mc_on, mc_per_gram, making_charges, rate, rate_amt, tax_percent,
           tax_amt, total_price, pricing, pieace_cost, disscount_percentage, disscount, hm_charges, total_amount,
           taxable_amount, tax_amount, net_amount, original_total_price, opentag_id, qty
-        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`;
 
       const insertValues = [
         data.date,
@@ -107,6 +109,8 @@ router.post("/add/estimate", async (req, res) => {
         sanitizeNumber(data.va_on),
         sanitizeNumber(data.va_percent),
         sanitizeNumber(data.wastage_weight),
+        sanitizeNumber(data.msp_va_percent),
+        sanitizeNumber(data.msp_wastage_weight),
         sanitizeNumber(data.total_weight_av),
         sanitizeNumber(data.mc_on),
         sanitizeNumber(data.mc_per_gram),
@@ -159,13 +163,13 @@ router.put("/edit/estimate/:id", async (req, res) => {
     const sql = `UPDATE estimate SET
         date=?, pcode=?, estimate_number=?, code=?, product_id=?, product_name=?, metal_type=?, design_name=?,
         purity=?, category=?, sub_category=?, gross_weight=?, stone_weight=?, stone_price=?, weight_bw=?, va_on=?, va_percent=?,
-        wastage_weight=?, total_weight_av=?, mc_on=?, mc_per_gram=?, making_charges=?, rate=?, rate_amt=?, tax_percent=?, tax_amt=?, total_price=?
+        wastage_weight=?, msp_va_percent=?, msp_wastage_weight=?, total_weight_av=?, mc_on=?, mc_per_gram=?, making_charges=?, rate=?, rate_amt=?, tax_percent=?, tax_amt=?, total_price=?
         WHERE id=?`;
 
     const [result] = await db.query(sql, [
       data.date, data.pcode, data.estimate_number, data.code, data.product_id, data.product_name, data.metal_type, data.design_name,
       data.purity, data.category, data.sub_category, data.gross_weight, data.stone_weight, data.stone_price, data.weight_bw,
-      data.va_on, data.va_percent, data.wastage_weight, data.total_weight_av, data.mc_on, data.mc_per_gram, data.making_charges,
+      data.va_on, data.va_percent, data.wastage_weight, data.msp_va_percent, data.msp_wastage_weight, data.total_weight_av, data.mc_on, data.mc_per_gram, data.making_charges,
       data.rate, data.rate_amt, data.tax_percent, data.tax_amt, data.total_price, id
     ]);
 
@@ -250,8 +254,8 @@ router.get("/get-estimates/:estimate_number", async (req, res) => {
       metal_type: row.metal_type, design_name: row.design_name, purity: row.purity,
       category: row.category, sub_category: row.sub_category, gross_weight: row.gross_weight,
       stone_weight: row.stone_weight, stone_price: row.stone_price, weight_bw: row.weight_bw,
-      va_on: row.va_on, va_percent: row.va_percent, wastage_weight: row.wastage_weight,
-      total_weight_av: row.total_weight_av, mc_on: row.mc_on, mc_per_gram: row.mc_per_gram,
+      va_on: row.va_on, va_percent: row.va_percent, wastage_weight: row.wastage_weight, msp_va_percent: row.msp_va_percent, 
+      msp_wastage_weight: row.msp_wastage_weight, total_weight_av: row.total_weight_av, mc_on: row.mc_on, mc_per_gram: row.mc_per_gram,
       making_charges: row.making_charges, rate: row.rate, rate_amt: row.rate_amt,
       tax_percent: row.tax_percent, tax_amt: row.tax_amt, total_price: row.total_price,
       pricing: row.pricing, pieace_cost: row.pieace_cost, disscount_percentage: row.disscount_percentage,

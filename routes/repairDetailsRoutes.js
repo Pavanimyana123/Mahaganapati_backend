@@ -119,4 +119,40 @@ router.delete('/assigned-repairdetails/:id', async (req, res) => {
   }
 });
 
+router.put("/repairs/:repair_id", async (req, res) => {
+  const { repair_id } = req.params;
+  const { gross_wt_after_repair, total_amt, mc_for_repair } = req.body;
+
+  const query = `
+    UPDATE repairs
+    SET gross_wt_after_repair = ?, 
+        total_amt = ?, 
+        making_charge = ?, 
+        status = 'Receive from Workshop'
+    WHERE repair_id = ?
+  `;
+
+  try {
+    db.query(
+      query,
+      [gross_wt_after_repair, total_amt, mc_for_repair, repair_id],
+      (err, result) => {
+        if (err) {
+          console.error("Error updating repair:", err);
+          return res.status(500).json({ error: "Failed to update repair" });
+        }
+
+        if (result.affectedRows === 0) {
+          return res.status(404).json({ message: "Repair not found" });
+        }
+
+        res.status(200).json({ message: "Repair updated successfully" });
+      }
+    );
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    res.status(500).json({ error: "Failed to update repair" });
+  }
+});
+
 module.exports = router;
