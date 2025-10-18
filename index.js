@@ -33,6 +33,7 @@ const receiptRoutes = require('./routes/receiptRoutes');
 const repairInvoiceRoutes = require('./routes/repairInvoiceRoutes');
 const offerRoutes = require('./routes/offerRoutes');
 const wastageRoutes = require('./routes/wastageRoutes');
+const userRoleRoutes = require('./routes/userRoleRoutes');
 
 
 const app = express();
@@ -79,6 +80,7 @@ app.use('/', receiptRoutes);
 app.use('/', repairInvoiceRoutes);
 app.use('/', offerRoutes);
 app.use('/', wastageRoutes);
+app.use('/', userRoleRoutes);
 
 
 // Start the server
