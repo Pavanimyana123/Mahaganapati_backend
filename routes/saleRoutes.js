@@ -159,7 +159,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             `${prefix}${padNumber(maxNumber + 1, 3)}` :
             originalInvoiceNumber;
 
-        // Calculate amounts
+        // Calculate amounts - UPDATED to use selected price option values
         let totalAmount = 0, discountAmt = 0, festivalDiscountAmt = 0;
         let taxableAmount = 0, taxAmount = 0, netAmount = 0;
 
@@ -173,23 +173,19 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             const itemTax = parseFloat(item.tax_amt) || 0;
 
             if (pricing === "By Weight") {
-                const stonePrice = parseFloat(item.stone_price) || 0;
-                const makingCharges = parseFloat(item.making_charges) || 0;
-                const rateAmt = parseFloat(item.rate_amt) || 0;
-                const hmCharges = parseFloat(item.hm_charges) || 0;
-
-                const itemTotal = stonePrice + makingCharges + rateAmt + hmCharges;
+                // UPDATED: Use total_price which already includes the selected price option calculation
+                const itemTotal = parseFloat(item.total_price) || 0;
                 totalAmount += itemTotal;
                 discountAmt += itemDiscount;
                 festivalDiscountAmt += itemFestivalDiscount;
 
-                const totalDiscount = itemDiscount + itemFestivalDiscount;
-                const itemTaxable = itemTotal - totalDiscount;
-
+                // UPDATED: Calculate taxable amount from total_price and tax_amt
+                const itemTaxable = itemTotal - itemTax;
                 taxableAmount += itemTaxable;
                 taxAmount += itemTax;
-                netAmount += itemTaxable + itemTax;
+                netAmount += itemTotal;
             } else {
+                // For fixed pricing - keep existing logic
                 const pieceCost = parseFloat(item.pieace_cost) || 0;
                 const qty = parseFloat(item.qty) || 0;
 
@@ -439,29 +435,28 @@ async function handleOpeningTagsEntry(items, invoiceNumber) {
         // Check if opentag_id is 0 or null/undefined
         if (!item.opentag_id || item.opentag_id === 0) {
             try {
-                // Insert into opening_tags_entry - FIXED: Added missing comma after PCode_BarCode
+                // Insert into opening_tags_entry - UPDATED: Added MSP wastage fields
                 const [opentagResult] = await db.execute(`
                     INSERT INTO opening_tags_entry (
                         product_id, sub_category, Pricing, metal_type, Purity,
                         Gross_Weight, Stones_Weight, Weight_BW, Wastage_On, Wastage_Percentage, WastageWeight, 
-                        TotalWeight_AW, MC_Per_Gram, Making_Charges_on, Making_Charges, Stones_Price, design_master, 
+                        msp_Wastage_Percentage, msp_WastageWeight, TotalWeight_AW, MC_Per_Gram, Making_Charges_on, Making_Charges, Stones_Price, design_master, 
                         category, pieace_cost, pcs, Status
-                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     item.product_id || null,
                     item.product_name || null,
                     item.pricing || null,
                     item.metal_type || null,
                     item.purity || null,
-                    // item.code || null,
                     sanitizeNumeric(item.gross_weight),
                     sanitizeNumeric(item.stone_weight),
                     sanitizeNumeric(item.weight_bw),
                     item.va_on || null,
                     sanitizeNumeric(item.va_percent),
                     sanitizeNumeric(item.wastage_weight),
-                    sanitizeNumeric(item.msp_va_percent),
-                    sanitizeNumeric(item.msp_wastage_weight),
+                    sanitizeNumeric(item.msp_va_percent),  // ADDED: MSP wastage percentage
+                    sanitizeNumeric(item.msp_wastage_weight), // ADDED: MSP wastage weight
                     sanitizeNumeric(item.total_weight_av),
                     sanitizeNumeric(item.mc_per_gram),
                     item.mc_on || null,
@@ -469,7 +464,7 @@ async function handleOpeningTagsEntry(items, invoiceNumber) {
                     sanitizeNumeric(item.stone_price),
                     item.design_name || null,
                     item.category || null,
-                    sanitizeNumeric(item.piece_cost),
+                    sanitizeNumeric(item.pieace_cost), // FIXED: Changed from piece_cost to pieace_cost
                     sanitizeNumeric(item.qty),
                     'Sold'
                 ]);
