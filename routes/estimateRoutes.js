@@ -10,7 +10,7 @@ const sanitizeNumeric = (val) => (val ? parseFloat(val.toString().replace(/[^\d.
 router.post("/add/estimate", async (req, res) => {
   try {
     const data = req.body;
-
+    // console.log("Received body=",req.body)
     if (!data.date || !data.estimate_number) {
       return res.status(400).json({ message: "Missing required fields" });
     }
