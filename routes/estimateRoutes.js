@@ -1,6 +1,9 @@
 const express = require("express");
 const db = require("../db"); // mysql2/promise pool
 const router = express.Router();
+const fs = require('fs').promises;
+const path = require('path');
+
 
 // Helper functions
 const sanitizeNumber = (val, def = 0) => (val === "" || val === null ? def : val);
@@ -184,13 +187,37 @@ router.put("/edit/estimate/:id", async (req, res) => {
 router.delete("/delete/estimate/:estimate_number", async (req, res) => {
   try {
     const estimateNumber = req.params.estimate_number;
+    
+    if (!estimateNumber) {
+      return res.status(400).json({ message: "Estimate number is required" });
+    }
+
+    // Delete the PDF file if it exists
+    try {
+      const pdfPath = path.join(__dirname, '../uploads/invoices', `${estimateNumber}.pdf`);
+      await fs.access(pdfPath); // Check if file exists
+      await fs.unlink(pdfPath); // Delete the file
+      // console.log(`PDF file deleted: ${estimateNumber}.pdf`);
+    } catch (fileError) {
+      // File doesn't exist or couldn't be deleted - log but don't fail the operation
+      console.log(`PDF file not found or couldn't be deleted: ${estimateNumber}.pdf`, fileError.message);
+    }
+
+    // Delete from database
     const [result] = await db.query("DELETE FROM estimate WHERE estimate_number=?", [estimateNumber]);
-    if (result.affectedRows === 0) return res.status(404).json({ message: "Estimate not found" });
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Estimate not found" });
+    }
+    
     res.json({ message: "Estimate deleted successfully" });
+    
   } catch (err) {
+    console.error('Error deleting estimate:', err.message);
     res.status(500).json({ message: "Failed to delete estimate", error: err.message });
   }
 });
+
 
 // Get last estimate number
 router.get("/lastEstimateNumber", async (req, res) => {

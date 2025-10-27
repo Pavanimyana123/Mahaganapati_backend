@@ -10,7 +10,7 @@ router.post('/convert-repair', async (req, res) => {
   try {
     // 1. Get the last invoice number
     const [lastInvoiceResult] = await db.query(
-      'SELECT invoice_number FROM repair_details ORDER BY invoice_number DESC LIMIT 1'
+      'SELECT invoice_number FROM sale_details ORDER BY invoice_number DESC LIMIT 1'
     );
 
     let nextInvoiceNumber = 'SMJ001';
@@ -21,18 +21,24 @@ router.post('/convert-repair', async (req, res) => {
       nextInvoiceNumber = `SMJ${String(next).padStart(3, '0')}`;
     }
 
-    // 2. Format date and time
+    // 2. Calculate GST amounts
+    const totalAmt = parseFloat(repair.total_amt) || 0;
+    const taxPercent = 5; // 5% GST
+    const taxAmt = (totalAmt * taxPercent) / 100;
+    const netbillAmt = totalAmt + taxAmt;
+
+    // 3. Format date and time
     let currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     let formattedDate = new Date(repair.date).toLocaleDateString('en-GB');
     formattedDate = formattedDate.split('/').reverse().join('-');
 
-    // 3. Insert into repair_details
+    // 4. Insert into sale_details with GST fields
     await db.query(
-      `INSERT INTO repair_details (
+      `INSERT INTO sale_details (
         invoice_number, order_number, customer_id, account_name, mobile, email, address1, address2, city,
-        sub_category, product_name, metal_type, purity, category, gross_weight, qty, total_price, net_amount,
-        net_bill_amount, bal_amt, invoice, transaction_status, time, date
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        sub_category, product_name, metal_type, purity, category, gross_weight, qty, total_price, tax_percent, tax_amt, taxable_amount,
+        tax_amount, net_amount, net_bill_amount, bal_amt, invoice, transaction_status, time, date
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         nextInvoiceNumber,
         repair.repair_no,
@@ -50,10 +56,14 @@ router.post('/convert-repair', async (req, res) => {
         repair.category,
         repair.gross_weight,
         repair.pcs,
-        repair.total_amt,
-        repair.total_amt,
-        repair.total_amt,
-        repair.total_amt,
+        totalAmt,
+        taxPercent,
+        taxAmt,
+        totalAmt,
+        taxAmt,
+        netbillAmt,
+        netbillAmt,
+        netbillAmt,
         'Converted',
         'ConvertedRepairInvoice',
         currentTime,
@@ -61,10 +71,25 @@ router.post('/convert-repair', async (req, res) => {
       ]
     );
 
-    // 4. Update repair status in `repairs` table
+    // 5. Update repair status and tax fields in `repairs` table
     await db.query(
-      'UPDATE repairs SET invoice = ?, status = ?, invoice_number = ? WHERE repair_id = ?',
-      ['Converted', 'Delivered to Customer', nextInvoiceNumber, repair.repair_id]
+      `UPDATE repairs SET 
+        invoice = ?, 
+        status = ?, 
+        invoice_number = ?,
+        tax_percent = ?,
+        tax_amt = ?,
+        net_bill_amt = ?
+      WHERE repair_id = ?`,
+      [
+        'Converted',
+        'Delivered to Customer',
+        nextInvoiceNumber,
+        taxPercent,
+        taxAmt,
+        netbillAmt,
+        repair.repair_id
+      ]
     );
 
     res.json({ success: true, invoiceNumber: nextInvoiceNumber });
@@ -80,7 +105,7 @@ router.get('/get-repair-invoice/:order_number', async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      'SELECT * FROM repair_details WHERE order_number = ?',
+      'SELECT * FROM sale_details WHERE order_number = ?',
       [order_number]
     );
 
@@ -94,5 +119,7 @@ router.get('/get-repair-invoice/:order_number', async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
+
+
 
 module.exports = router;

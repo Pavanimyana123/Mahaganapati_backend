@@ -6,6 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const router = express.Router();
 
+
 // Configure multer storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -951,122 +952,127 @@ router.get("/get/repair-details", async (req, res) => {
     }
 });
 
-router.delete('/repair-details/:invoiceNumber', async (req, res) => {
-    const { invoiceNumber } = req.params;
-    const { skipMessage } = req.query;
+// router.delete('/repair-details/:invoiceNumber', async (req, res) => {
+//     const { invoiceNumber } = req.params;
+//     const { skipMessage } = req.query;
 
-    if (!invoiceNumber) {
-        return res.status(400).json({ message: 'Invoice number is required' });
-    }
+//     if (!invoiceNumber) {
+//         return res.status(400).json({ message: 'Invoice number is required' });
+//     }
 
-    let connection;
-    try {
-        // Get connection for transaction
-        connection = await db.getConnection();
-        await connection.beginTransaction();
+//     let connection;
+//     try {
+//         // Get connection for transaction
+//         connection = await db.getConnection();
+//         await connection.beginTransaction();
 
+//         // 1️⃣ Get sale details with transaction status
+//         const [saleDetails] = await connection.execute(
+//             `SELECT opentag_id, product_id, qty, gross_weight, transaction_status 
+//        FROM sale_details 
+//        WHERE invoice_number = ?`,
+//             [invoiceNumber]
+//         );
 
-        // 1️⃣ Get sale details with transaction status
-        const [saleDetails] = await connection.execute(
-            `SELECT opentag_id, product_id, qty, gross_weight, transaction_status 
-       FROM sale_details 
-       WHERE invoice_number = ?`,
-            [invoiceNumber]
-        );
+//         if (saleDetails.length === 0) {
+//             await connection.rollback();
+//             return res.status(404).json({ message: 'No sale details found for this invoice' });
+//         }
 
-        if (saleDetails.length === 0) {
-            await connection.rollback();
-            return res.status(404).json({ message: 'No sale details found for this invoice' });
-        }
+//         const transactionStatus = saleDetails[0].transaction_status;
+//         const validStatuses = ['Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice'];
 
+//         if (!validStatuses.includes(transactionStatus)) {
+//             await connection.rollback();
+//             return res.status(400).json({
+//                 message: `Cannot delete invoice with transaction status: ${transactionStatus}`
+//             });
+//         }
 
-        const transactionStatus = saleDetails[0].transaction_status;
-        const validStatuses = ['Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice'];
+//         // 2️⃣ If transaction status is 'Sales', update product quantities
+//         if (transactionStatus === 'Sales') {
+//             const opentagIds = saleDetails.map(row => row.opentag_id).filter(id => id);
 
-        if (!validStatuses.includes(transactionStatus)) {
-            await connection.rollback();
-            return res.status(400).json({
-                message: `Cannot delete invoice with transaction status: ${transactionStatus}`
-            });
-        }
+//             // Update products
+//             for (const detail of saleDetails) {
+//                 if (detail.product_id) {
+//                     await connection.execute(
+//                         `UPDATE product 
+//              SET 
+//                sale_qty = sale_qty - ?,
+//                sale_weight = sale_weight - ?,
+//                bal_qty = pur_qty - sale_qty,
+//                bal_weight = pur_weight - sale_weight
+//              WHERE product_id = ?`,
+//                         [detail.qty || 0, detail.gross_weight || 0, detail.product_id]
+//                     );
+//                 }
+//             }
 
-        // 2️⃣ If transaction status is 'Sales', update product quantities
-        if (transactionStatus === 'Sales') {
-            const opentagIds = saleDetails.map(row => row.opentag_id).filter(id => id);
+//             // 3️⃣ Update opening_tags_entry status if opentagIds exist
+//             if (opentagIds.length > 0) {
+//                 const placeholders = opentagIds.map(() => '?').join(',');
+//                 await connection.execute(
+//                     `UPDATE opening_tags_entry SET Status = 'Available' WHERE opentag_id IN (${placeholders})`,
+//                     opentagIds
+//                 );
+//             }
+//         }
 
-            // Update products
-            for (const detail of saleDetails) {
-                if (detail.product_id) {
-                    await connection.execute(
-                        `UPDATE product 
-             SET 
-               sale_qty = sale_qty - ?,
-               sale_weight = sale_weight - ?,
-               bal_qty = pur_qty - sale_qty,
-               bal_weight = pur_weight - sale_weight
-             WHERE product_id = ?`,
-                        [detail.qty || 0, detail.gross_weight || 0, detail.product_id]
-                    );
+//         // 4️⃣ Delete old_items
+//         await connection.execute(
+//             'DELETE FROM old_items WHERE invoice_id = ?',
+//             [invoiceNumber]
+//         );
 
-                }
-            }
+//         // 5️⃣ Delete sale_details
+//         const [deleteResult] = await connection.execute(
+//             `DELETE FROM sale_details 
+//        WHERE invoice_number = ? 
+//        AND transaction_status IN ('Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice')`,
+//             [invoiceNumber]
+//         );
 
-            // 3️⃣ Update opening_tags_entry status if opentagIds exist
-            if (opentagIds.length > 0) {
-                const placeholders = opentagIds.map(() => '?').join(',');
-                await connection.execute(
-                    `UPDATE opening_tags_entry SET Status = 'Available' WHERE opentag_id IN (${placeholders})`,
-                    opentagIds
-                );
+//         // 6️⃣ Delete the PDF file after successful database operations
+//         try {
+//             const pdfPath = path.join(__dirname, '../uploads/invoices', `${invoiceNumber}.pdf`);
+//             await fs.access(pdfPath); // Check if file exists
+//             await fs.unlink(pdfPath); // Delete the file
+//             console.log(`PDF file deleted: ${invoiceNumber}.pdf`);
+//         } catch (fileError) {
+//             // File doesn't exist or couldn't be deleted - log but don't fail the operation
+//             console.log(`PDF file not found or couldn't be deleted: ${invoiceNumber}.pdf`, fileError.message);
+//         }
 
-            }
-        }
+//         // Commit transaction
+//         await connection.commit();
 
-        // 4️⃣ Delete old_items
-        await connection.execute(
-            'DELETE FROM old_items WHERE invoice_id = ?',
-            [invoiceNumber]
-        );
+//         if (skipMessage === 'true') {
+//             return res.sendStatus(204);
+//         }
 
+//         res.status(200).json({
+//             message: 'Sale details deleted successfully',
+//             deletedRows: deleteResult.affectedRows
+//         });
 
-        // 5️⃣ Delete sale_details
-        const [deleteResult] = await connection.execute(
-            `DELETE FROM sale_details 
-       WHERE invoice_number = ? 
-       AND transaction_status IN ('Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice')`,
-            [invoiceNumber]
-        );
-
-
-        // Commit transaction
-        await connection.commit();
-
-        if (skipMessage === 'true') {
-            return res.sendStatus(204);
-        }
-
-        res.status(200).json({
-            message: 'Sale details deleted successfully',
-            deletedRows: deleteResult.affectedRows
-        });
-
-    } catch (error) {
-        // Rollback transaction in case of error
-        if (connection) {
-            await connection.rollback();
-        }
-        console.error('Error deleting repair details:', error);
-        res.status(500).json({
-            message: 'Failed to delete sale details',
-            error: error.message
-        });
-    } finally {
-        // Release connection back to pool
-        if (connection) {
-            connection.release();
-        }
-    }
-});
+//     } catch (error) {
+//         // Rollback transaction in case of error
+//         if (connection) {
+//             await connection.rollback();
+//         }
+//         console.error('Error deleting repair details:', error);
+//         res.status(500).json({
+//             message: 'Failed to delete sale details',
+//             error: error.message
+//         });
+//     } finally {
+//         // Release connection back to pool
+//         if (connection) {
+//             connection.release();
+//         }
+//     }
+// });
 
 module.exports = router;
 
