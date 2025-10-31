@@ -69,14 +69,14 @@ const padNumber = (num, size) => {
 };
 
 const sanitizeNumeric = (value) => {
-    if (value === null || value === undefined || value === 'NaN') return 0;
+    if (value === null || value === undefined || value === 'NaN' || value === '') return 0;
     const num = parseFloat(value.toString().replace(/[^\d.]/g, ""));
     return isNaN(num) ? 0 : num;
 };
 
 router.post("/save-repair-details", upload.array("product_image", 10), async (req, res) => {
     try {
-        const { repairDetails, oldItems = [], memberSchemes = [], salesNetAmount } = req.body;
+        const { repairDetails, oldItems = [], memberSchemes = [], salesNetAmount, totalAmount, taxableAmount, taxAmount, netAmount, discountAmt, festivalDiscountAmt } = req.body;
 
         if (!Array.isArray(repairDetails) || repairDetails.length === 0) {
             return res.status(400).json({ message: "No data to save" });
@@ -161,48 +161,48 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             originalInvoiceNumber;
 
         // Calculate amounts - UPDATED to use selected price option values
-        let totalAmount = 0, discountAmt = 0, festivalDiscountAmt = 0;
-        let taxableAmount = 0, taxAmount = 0, netAmount = 0;
+        // let totalAmount = 0, discountAmt = 0, festivalDiscountAmt = 0;
+        // let taxableAmount = 0, taxAmount = 0, netAmount = 0;
 
-        repairDetails.forEach((item) => {
-            const pricing = item.pricing;
-            item.finalReceiptsAmt = item.receipts_amt === "" ? 0.0 : parseFloat(item.receipts_amt) || 0.0;
-            item.finalBalAfterReceipts = item.bal_after_receipts === "" ? 0.0 : parseFloat(item.bal_after_receipts) || 0.0;
+        // repairDetails.forEach((item) => {
+        //     const pricing = item.pricing;
+        //     item.finalReceiptsAmt = item.receipts_amt === "" ? 0.0 : parseFloat(item.receipts_amt) || 0.0;
+        //     item.finalBalAfterReceipts = item.bal_after_receipts === "" ? 0.0 : parseFloat(item.bal_after_receipts) || 0.0;
 
-            const itemDiscount = parseFloat(item.disscount) || 0;
-            const itemFestivalDiscount = parseFloat(item.festival_discount) || 0;
-            const itemTax = parseFloat(item.tax_amt) || 0;
+        //     const itemDiscount = parseFloat(item.disscount) || 0;
+        //     const itemFestivalDiscount = parseFloat(item.festival_discount) || 0;
+        //     const itemTax = parseFloat(item.tax_amt) || 0;
 
-            if (pricing === "By Weight") {
-                // UPDATED: Use total_price which already includes the selected price option calculation
-                const itemTotal = parseFloat(item.total_price) || 0;
-                totalAmount += itemTotal;
-                discountAmt += itemDiscount;
-                festivalDiscountAmt += itemFestivalDiscount;
+        //     if (pricing === "By Weight") {
+        //         // UPDATED: Use total_price which already includes the selected price option calculation
+        //         const itemTotal = parseFloat(item.total_price) || 0;
+        //         totalAmount += itemTotal;
+        //         discountAmt += itemDiscount;
+        //         festivalDiscountAmt += itemFestivalDiscount;
 
-                // UPDATED: Calculate taxable amount from total_price and tax_amt
-                const itemTaxable = itemTotal - itemTax;
-                taxableAmount += itemTaxable;
-                taxAmount += itemTax;
-                netAmount += itemTotal;
-            } else {
-                // For fixed pricing - keep existing logic
-                const pieceCost = parseFloat(item.pieace_cost) || 0;
-                const qty = parseFloat(item.qty) || 0;
+        //         // UPDATED: Calculate taxable amount from total_price and tax_amt
+        //         const itemTaxable = itemTotal - itemTax;
+        //         taxableAmount += itemTaxable;
+        //         taxAmount += itemTax;
+        //         netAmount += itemTotal;
+        //     } else {
+        //         // For fixed pricing - keep existing logic
+        //         const pieceCost = parseFloat(item.pieace_cost) || 0;
+        //         const qty = parseFloat(item.qty) || 0;
 
-                const itemTotal = pieceCost * qty;
-                totalAmount += itemTotal;
-                discountAmt += itemDiscount;
-                festivalDiscountAmt += itemFestivalDiscount;
+        //         const itemTotal = pieceCost * qty;
+        //         totalAmount += itemTotal;
+        //         discountAmt += itemDiscount;
+        //         festivalDiscountAmt += itemFestivalDiscount;
 
-                const totalDiscount = itemDiscount + itemFestivalDiscount;
-                const itemTaxable = itemTotal - totalDiscount;
+        //         const totalDiscount = itemDiscount + itemFestivalDiscount;
+        //         const itemTaxable = itemTotal - totalDiscount;
 
-                taxableAmount += itemTaxable;
-                taxAmount += itemTax;
-                netAmount += itemTaxable + itemTax;
-            }
-        });
+        //         taxableAmount += itemTaxable;
+        //         taxAmount += itemTax;
+        //         netAmount += itemTaxable + itemTax;
+        //     }
+        // });
 
         const totalOldAmount = oldItems.reduce((sum, item) => sum + (parseFloat(item.total_amount) || 0), 0);
         const parsedSalesNetAmount = parseFloat(salesNetAmount) || 0;
@@ -240,8 +240,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 }
             });
 
-            // Update existing items
-            // Update existing items
+            // Update existing items - FIXED PARAMETERS
             for (let item of itemsToUpdate) {
                 const cashAmount = parseFloat(item.cash_amount) || 0;
                 const cardAmount = parseFloat(item.card_amt) || 0;
@@ -271,36 +270,97 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             paid_amt=?, piece_taxable_amt=?, original_piece_taxable_amt=?
         WHERE id=?`,
                     [
-                        item.customer_id || null, item.mobile || null, item.account_name || null, item.email || null,
-                        item.address1 || null, item.address2 || null, item.city || null, item.pincode || null,
-                        item.state || null, item.state_code || null, item.aadhar_card || null, item.gst_in || null,
-                        item.pan_card || null, item.terms || null, item.date || null, currentTime,
-                        item.code || null, item.product_id || null, item.opentag_id || null, item.metal || null,
-                        item.product_name || null, item.metal_type || null, item.design_name || null,
-                        item.purity || null, item.selling_purity || null, item.printing_purity || null,
-                        item.custom_purity || null, item.pricing || null, item.category || null,
-                        item.sub_category || null, sanitizeNumeric(item.gross_weight), sanitizeNumeric(item.stone_weight),
-                        sanitizeNumeric(item.weight_bw), sanitizeNumeric(item.stone_price), item.va_on || null,
-                        sanitizeNumeric(item.va_percent), sanitizeNumeric(item.wastage_weight),
-                        sanitizeNumeric(item.msp_va_percent), sanitizeNumeric(item.msp_wastage_weight), sanitizeNumeric(item.total_weight_av),
-                        item.mc_on || null, sanitizeNumeric(item.mc_per_gram), sanitizeNumeric(item.making_charges),
-                        sanitizeNumeric(item.disscount_percentage), sanitizeNumeric(item.disscount), sanitizeNumeric(item.festival_discount),
-                        sanitizeNumeric(item.rate), sanitizeNumeric(item.rate_24k), sanitizeNumeric(item.pieace_cost),
-                        sanitizeNumeric(item.mrp_price), sanitizeNumeric(item.rate_amt), sanitizeNumeric(item.tax_percent),
-                        sanitizeNumeric(item.tax_amt), sanitizeNumeric(item.original_total_price), sanitizeNumeric(item.total_price),
-                        sanitizeNumeric(item.cash_amount), sanitizeNumeric(item.card_amount), sanitizeNumeric(item.card_amt),
-                        item.chq || null, sanitizeNumeric(item.chq_amt), item.online || null, sanitizeNumeric(item.online_amt),
-                        item.transaction_status || "Sales", sanitizeNumeric(item.qty), item.product_image || null,
-                        item.imagePreview || null, item.order_number || null, item.invoice || null, sanitizeNumeric(item.hm_charges),
-                        item.remarks || null, item.sale_status || null, item.invoice_number || null,
-                        taxableAmount, taxAmount, netAmount, totalOldAmount, schemesTotalAmount, parsedSalesNetAmount,
-                        item.finalReceiptsAmt, item.finalBalAfterReceipts, balAmt, roundedNetBillAmount, paidAmt,
-                        sanitizeNumeric(item.piece_taxable_amt), sanitizeNumeric(item.original_piece_taxable_amt), item.id
+                        item.customer_id || null,
+                        item.mobile || null,
+                        item.account_name || null,
+                        item.email || null,
+                        item.address1 || null,
+                        item.address2 || null,
+                        item.city || null,
+                        item.pincode || null,
+                        item.state || null,
+                        item.state_code || null,
+                        item.aadhar_card || null,
+                        item.gst_in || null,
+                        item.pan_card || null,
+                        item.terms || null,
+                        item.date || null,
+                        currentTime,
+                        item.code || null,
+                        item.product_id || null,
+                        item.opentag_id || null,
+                        item.metal || null,
+                        item.product_name || null,
+                        item.metal_type || null,
+                        item.design_name || null,
+                        item.purity || null,
+                        item.selling_purity || null,
+                        item.printing_purity || null,
+                        item.custom_purity || null,
+                        item.pricing || null,
+                        item.category || null,
+                        item.sub_category || null,
+                        sanitizeNumeric(item.gross_weight),
+                        sanitizeNumeric(item.stone_weight),
+                        sanitizeNumeric(item.weight_bw),
+                        sanitizeNumeric(item.stone_price),
+                        item.va_on || null,
+                        sanitizeNumeric(item.va_percent),
+                        sanitizeNumeric(item.wastage_weight),
+                        sanitizeNumeric(item.msp_va_percent),
+                        sanitizeNumeric(item.msp_wastage_weight),
+                        sanitizeNumeric(item.total_weight_av),
+                        item.mc_on || null,
+                        sanitizeNumeric(item.mc_per_gram),
+                        sanitizeNumeric(item.making_charges),
+                        sanitizeNumeric(item.disscount_percentage),
+                        sanitizeNumeric(item.disscount),
+                        sanitizeNumeric(item.festival_discount),
+                        sanitizeNumeric(item.rate),
+                        sanitizeNumeric(item.rate_24k),
+                        sanitizeNumeric(item.pieace_cost),
+                        sanitizeNumeric(item.mrp_price),
+                        sanitizeNumeric(item.rate_amt),
+                        sanitizeNumeric(item.tax_percent),
+                        sanitizeNumeric(item.tax_amt),
+                        sanitizeNumeric(item.original_total_price),
+                        sanitizeNumeric(item.total_price),
+                        sanitizeNumeric(item.cash_amount),
+                        sanitizeNumeric(item.card_amount),
+                        sanitizeNumeric(item.card_amt),
+                        item.chq || null,
+                        sanitizeNumeric(item.chq_amt),
+                        item.online || null,
+                        sanitizeNumeric(item.online_amt),
+                        item.transaction_status || "Sales",
+                        sanitizeNumeric(item.qty),
+                        item.product_image || null,
+                        item.imagePreview || null,
+                        item.order_number || null,
+                        item.invoice || null,
+                        sanitizeNumeric(item.hm_charges),
+                        item.remarks || null,
+                        item.sale_status || null,
+                        item.invoice_number || null,
+                        sanitizeNumeric(taxableAmount),
+                        sanitizeNumeric(taxAmount),
+                        sanitizeNumeric(netAmount),
+                        sanitizeNumeric(totalOldAmount),
+                        sanitizeNumeric(schemesTotalAmount),
+                        sanitizeNumeric(parsedSalesNetAmount),
+                        sanitizeNumeric(item.finalReceiptsAmt || 0),
+                        sanitizeNumeric(item.finalBalAfterReceipts || 0),
+                        sanitizeNumeric(balAmt),
+                        sanitizeNumeric(roundedNetBillAmount),
+                        sanitizeNumeric(paidAmt),
+                        sanitizeNumeric(item.piece_taxable_amt || 0),
+                        sanitizeNumeric(item.original_piece_taxable_amt || 0),
+                        item.id
                     ]
                 );
             }
 
-            // Insert new items
+            // Insert new items - FIXED PARAMETERS
             if (itemsToInsert.length > 0) {
                 const insertValues = itemsToInsert.map(item => {
                     const cashAmount = parseFloat(item.cash_amount) || 0;
@@ -314,97 +374,96 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                     const balAmt = roundedNetBillAmount - paidAmt;
 
                     return [
-    item.customer_id, 
-    item.mobile, 
-    item.account_name, 
-    item.email, 
-    item.address1, 
-    item.address2,
-    item.city, 
-    item.pincode, 
-    item.state, 
-    item.state_code, 
-    item.aadhar_card, 
-    item.gst_in, 
-    item.pan_card,
-    item.terms, 
-    item.date, 
-    currentTime, 
-    newInvoiceNumber, 
-    item.code, 
-    item.product_id, 
-    item.opentag_id,
-    item.metal, 
-    item.product_name, 
-    item.metal_type, 
-    item.design_name, 
-    item.purity, 
-    item.selling_purity,
-    item.printing_purity, 
-    item.custom_purity, 
-    item.pricing, 
-    item.category, 
-    item.sub_category,
-    sanitizeNumeric(item.gross_weight), 
-    sanitizeNumeric(item.stone_weight), 
-    sanitizeNumeric(item.weight_bw), 
-    sanitizeNumeric(item.stone_price), 
-    item.va_on, 
-    sanitizeNumeric(item.va_percent),
-    sanitizeNumeric(item.wastage_weight), 
-    sanitizeNumeric(item.msp_va_percent), 
-    sanitizeNumeric(item.msp_wastage_weight), 
-    sanitizeNumeric(item.total_weight_av), 
-    item.mc_on, 
-    sanitizeNumeric(item.mc_per_gram), 
-    sanitizeNumeric(item.making_charges),
-    sanitizeNumeric(item.disscount_percentage), 
-    sanitizeNumeric(item.disscount), 
-    sanitizeNumeric(item.festival_discount), 
-    sanitizeNumeric(item.rate), 
-    sanitizeNumeric(item.rate_24k),
-    sanitizeNumeric(item.pieace_cost), 
-    sanitizeNumeric(item.mrp_price), 
-    sanitizeNumeric(item.rate_amt), 
-    sanitizeNumeric(item.tax_percent), 
-    sanitizeNumeric(item.tax_amt),
-    sanitizeNumeric(item.original_total_price), 
-    sanitizeNumeric(item.total_price), 
-    sanitizeNumeric(item.cash_amount), 
-    sanitizeNumeric(item.card_amount), 
-    sanitizeNumeric(item.card_amt),
-    item.chq, 
-    sanitizeNumeric(item.chq_amt), 
-    item.online, 
-    sanitizeNumeric(item.online_amt), 
-    item.transaction_status || "Sales",
-    sanitizeNumeric(item.qty), 
-    item.product_image, 
-    item.imagePreview, 
-    item.order_number, 
-    item.invoice, 
-    sanitizeNumeric(item.hm_charges),
-    item.remarks, 
-    item.sale_status, 
-    sanitizeNumeric(taxableAmount), 
-    sanitizeNumeric(taxAmount), 
-    sanitizeNumeric(netAmount), 
-    sanitizeNumeric(totalOldAmount),
-    sanitizeNumeric(schemesTotalAmount), 
-    sanitizeNumeric(parsedSalesNetAmount), 
-    sanitizeNumeric(item.finalReceiptsAmt), 
-    sanitizeNumeric(item.finalBalAfterReceipts),
-    sanitizeNumeric(balAmt), 
-    sanitizeNumeric(roundedNetBillAmount), 
-    sanitizeNumeric(paidAmt), 
-    sanitizeNumeric(item.piece_taxable_amt),
-    sanitizeNumeric(item.original_piece_taxable_amt)
-];
-
+                        item.customer_id || null,
+                        item.mobile || null,
+                        item.account_name || null,
+                        item.email || null,
+                        item.address1 || null,
+                        item.address2 || null,
+                        item.city || null,
+                        item.pincode || null,
+                        item.state || null,
+                        item.state_code || null,
+                        item.aadhar_card || null,
+                        item.gst_in || null,
+                        item.pan_card || null,
+                        item.terms || null,
+                        item.date || null,
+                        currentTime,
+                        newInvoiceNumber,
+                        item.code || null,
+                        item.product_id || null,
+                        item.opentag_id || null,
+                        item.metal || null,
+                        item.product_name || null,
+                        item.metal_type || null,
+                        item.design_name || null,
+                        item.purity || null,
+                        item.selling_purity || null,
+                        item.printing_purity || null,
+                        item.custom_purity || null,
+                        item.pricing || null,
+                        item.category || null,
+                        item.sub_category || null,
+                        sanitizeNumeric(item.gross_weight),
+                        sanitizeNumeric(item.stone_weight),
+                        sanitizeNumeric(item.weight_bw),
+                        sanitizeNumeric(item.stone_price),
+                        item.va_on || null,
+                        sanitizeNumeric(item.va_percent),
+                        sanitizeNumeric(item.wastage_weight),
+                        sanitizeNumeric(item.msp_va_percent),
+                        sanitizeNumeric(item.msp_wastage_weight),
+                        sanitizeNumeric(item.total_weight_av),
+                        item.mc_on || null,
+                        sanitizeNumeric(item.mc_per_gram),
+                        sanitizeNumeric(item.making_charges),
+                        sanitizeNumeric(item.disscount_percentage),
+                        sanitizeNumeric(item.disscount),
+                        sanitizeNumeric(item.festival_discount),
+                        sanitizeNumeric(item.rate),
+                        sanitizeNumeric(item.rate_24k),
+                        sanitizeNumeric(item.pieace_cost),
+                        sanitizeNumeric(item.mrp_price),
+                        sanitizeNumeric(item.rate_amt),
+                        sanitizeNumeric(item.tax_percent),
+                        sanitizeNumeric(item.tax_amt),
+                        sanitizeNumeric(item.original_total_price),
+                        sanitizeNumeric(item.total_price),
+                        sanitizeNumeric(item.cash_amount),
+                        sanitizeNumeric(item.card_amount),
+                        sanitizeNumeric(item.card_amt),
+                        item.chq || null,
+                        sanitizeNumeric(item.chq_amt),
+                        item.online || null,
+                        sanitizeNumeric(item.online_amt),
+                        item.transaction_status || "Sales",
+                        sanitizeNumeric(item.qty),
+                        item.product_image || null,
+                        item.imagePreview || null,
+                        item.order_number || null,
+                        item.invoice || null,
+                        sanitizeNumeric(item.hm_charges),
+                        item.remarks || null,
+                        item.sale_status || null,
+                        sanitizeNumeric(taxableAmount),
+                        sanitizeNumeric(taxAmount),
+                        sanitizeNumeric(netAmount),
+                        sanitizeNumeric(totalOldAmount),
+                        sanitizeNumeric(schemesTotalAmount),
+                        sanitizeNumeric(parsedSalesNetAmount),
+                        sanitizeNumeric(item.finalReceiptsAmt || 0),
+                        sanitizeNumeric(item.finalBalAfterReceipts || 0),
+                        sanitizeNumeric(balAmt),
+                        sanitizeNumeric(roundedNetBillAmount),
+                        sanitizeNumeric(paidAmt),
+                        sanitizeNumeric(item.piece_taxable_amt || 0),
+                        sanitizeNumeric(item.original_piece_taxable_amt || 0)
+                    ];
                 });
 
                 await db.query(`
-          INSERT INTO sale_details (
+        INSERT INTO sale_details (
             customer_id, mobile, account_name, email, address1, address2, city, pincode, state, state_code, 
             aadhar_card, gst_in, pan_card, terms, date, time, invoice_number, code, product_id, opentag_id, metal, 
             product_name, metal_type, design_name, purity, selling_purity, printing_purity, custom_purity, pricing, category, sub_category, 
@@ -415,10 +474,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             invoice, hm_charges, remarks, sale_status, taxable_amount, tax_amount, net_amount, old_exchange_amt, 
             scheme_amt, sale_return_amt, receipts_amt, bal_after_receipts, bal_amt, net_bill_amount, paid_amt, 
             piece_taxable_amt, original_piece_taxable_amt
-          ) VALUES ?`, [insertValues]);
-
-                // Handle opening_tags_entry insertion for items with opentag_id = 0 or null
-                await handleOpeningTagsEntry(itemsToInsert, newInvoiceNumber);
+        ) VALUES ?`, [insertValues]);
             }
 
             // Update repairs table - FIXED: Proper handling of IN clause
@@ -445,92 +501,92 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 const balAmt = roundedNetBillAmount - paidAmt;
 
                 return [
-    item.customer_id, 
-    item.mobile, 
-    item.account_name, 
-    item.email, 
-    item.address1, 
-    item.address2,
-    item.city, 
-    item.pincode, 
-    item.state, 
-    item.state_code, 
-    item.aadhar_card, 
-    item.gst_in, 
-    item.pan_card,
-    item.terms, 
-    item.date, 
-    currentTime, 
-    newInvoiceNumber, 
-    item.code, 
-    item.product_id, 
-    item.opentag_id,
-    item.metal, 
-    item.product_name, 
-    item.metal_type, 
-    item.design_name, 
-    item.purity, 
-    item.selling_purity,
-    item.printing_purity, 
-    item.custom_purity, 
-    item.pricing, 
-    item.category, 
-    item.sub_category,
-    sanitizeNumeric(item.gross_weight), 
-    sanitizeNumeric(item.stone_weight), 
-    sanitizeNumeric(item.weight_bw), 
-    sanitizeNumeric(item.stone_price), 
-    item.va_on, 
-    sanitizeNumeric(item.va_percent),
-    sanitizeNumeric(item.wastage_weight), 
-    sanitizeNumeric(item.msp_va_percent), 
-    sanitizeNumeric(item.msp_wastage_weight), 
-    sanitizeNumeric(item.total_weight_av), 
-    item.mc_on, 
-    sanitizeNumeric(item.mc_per_gram), 
-    sanitizeNumeric(item.making_charges),
-    sanitizeNumeric(item.disscount_percentage), 
-    sanitizeNumeric(item.disscount), 
-    sanitizeNumeric(item.festival_discount), 
-    sanitizeNumeric(item.rate), 
-    sanitizeNumeric(item.rate_24k),
-    sanitizeNumeric(item.pieace_cost), 
-    sanitizeNumeric(item.mrp_price), 
-    sanitizeNumeric(item.rate_amt), 
-    sanitizeNumeric(item.tax_percent), 
-    sanitizeNumeric(item.tax_amt),
-    sanitizeNumeric(item.original_total_price), 
-    sanitizeNumeric(item.total_price), 
-    sanitizeNumeric(item.cash_amount), 
-    sanitizeNumeric(item.card_amount), 
-    sanitizeNumeric(item.card_amt),
-    item.chq, 
-    sanitizeNumeric(item.chq_amt), 
-    item.online, 
-    sanitizeNumeric(item.online_amt), 
-    item.transaction_status || "Sales",
-    sanitizeNumeric(item.qty), 
-    item.product_image, 
-    item.imagePreview, 
-    item.order_number, 
-    item.invoice, 
-    sanitizeNumeric(item.hm_charges),
-    item.remarks, 
-    item.sale_status, 
-    sanitizeNumeric(taxableAmount), 
-    sanitizeNumeric(taxAmount), 
-    sanitizeNumeric(netAmount), 
-    sanitizeNumeric(totalOldAmount),
-    sanitizeNumeric(schemesTotalAmount), 
-    sanitizeNumeric(parsedSalesNetAmount), 
-    sanitizeNumeric(item.finalReceiptsAmt), 
-    sanitizeNumeric(item.finalBalAfterReceipts),
-    sanitizeNumeric(balAmt), 
-    sanitizeNumeric(roundedNetBillAmount), 
-    sanitizeNumeric(paidAmt), 
-    sanitizeNumeric(item.piece_taxable_amt),
-    sanitizeNumeric(item.original_piece_taxable_amt)
-];
+                    item.customer_id,
+                    item.mobile,
+                    item.account_name,
+                    item.email,
+                    item.address1,
+                    item.address2,
+                    item.city,
+                    item.pincode,
+                    item.state,
+                    item.state_code,
+                    item.aadhar_card,
+                    item.gst_in,
+                    item.pan_card,
+                    item.terms,
+                    item.date,
+                    currentTime,
+                    newInvoiceNumber,
+                    item.code,
+                    item.product_id,
+                    item.opentag_id,
+                    item.metal,
+                    item.product_name,
+                    item.metal_type,
+                    item.design_name,
+                    item.purity,
+                    item.selling_purity,
+                    item.printing_purity,
+                    item.custom_purity,
+                    item.pricing,
+                    item.category,
+                    item.sub_category,
+                    sanitizeNumeric(item.gross_weight),
+                    sanitizeNumeric(item.stone_weight),
+                    sanitizeNumeric(item.weight_bw),
+                    sanitizeNumeric(item.stone_price),
+                    item.va_on,
+                    sanitizeNumeric(item.va_percent),
+                    sanitizeNumeric(item.wastage_weight),
+                    sanitizeNumeric(item.msp_va_percent),
+                    sanitizeNumeric(item.msp_wastage_weight),
+                    sanitizeNumeric(item.total_weight_av),
+                    item.mc_on,
+                    sanitizeNumeric(item.mc_per_gram),
+                    sanitizeNumeric(item.making_charges),
+                    sanitizeNumeric(item.disscount_percentage),
+                    sanitizeNumeric(item.disscount),
+                    sanitizeNumeric(item.festival_discount),
+                    sanitizeNumeric(item.rate),
+                    sanitizeNumeric(item.rate_24k),
+                    sanitizeNumeric(item.pieace_cost),
+                    sanitizeNumeric(item.mrp_price),
+                    sanitizeNumeric(item.rate_amt),
+                    sanitizeNumeric(item.tax_percent),
+                    sanitizeNumeric(item.tax_amt),
+                    sanitizeNumeric(item.original_total_price),
+                    sanitizeNumeric(item.total_price),
+                    sanitizeNumeric(item.cash_amount),
+                    sanitizeNumeric(item.card_amount),
+                    sanitizeNumeric(item.card_amt),
+                    item.chq,
+                    sanitizeNumeric(item.chq_amt),
+                    item.online,
+                    sanitizeNumeric(item.online_amt),
+                    item.transaction_status || "Sales",
+                    sanitizeNumeric(item.qty),
+                    item.product_image,
+                    item.imagePreview,
+                    item.order_number,
+                    item.invoice,
+                    sanitizeNumeric(item.hm_charges),
+                    item.remarks,
+                    item.sale_status,
+                    sanitizeNumeric(taxableAmount),
+                    sanitizeNumeric(taxAmount),
+                    sanitizeNumeric(netAmount),
+                    sanitizeNumeric(totalOldAmount),
+                    sanitizeNumeric(schemesTotalAmount),
+                    sanitizeNumeric(parsedSalesNetAmount),
+                    sanitizeNumeric(item.finalReceiptsAmt),
+                    sanitizeNumeric(item.finalBalAfterReceipts),
+                    sanitizeNumeric(balAmt),
+                    sanitizeNumeric(roundedNetBillAmount),
+                    sanitizeNumeric(paidAmt),
+                    sanitizeNumeric(item.piece_taxable_amt),
+                    sanitizeNumeric(item.original_piece_taxable_amt)
+                ];
 
             });
 
