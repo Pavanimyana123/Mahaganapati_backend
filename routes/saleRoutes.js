@@ -639,7 +639,7 @@ async function handleOpeningTagsEntry(items, invoiceNumber) {
                         Gross_Weight, Stones_Weight, Weight_BW, Wastage_On, Wastage_Percentage, WastageWeight, 
                         msp_Wastage_Percentage, msp_WastageWeight, TotalWeight_AW, MC_Per_Gram, Making_Charges_on, Making_Charges, Stones_Price, design_master, 
                         category, pieace_cost, pcs, Status
-                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     item.product_id || null,
                     item.product_name || null,
