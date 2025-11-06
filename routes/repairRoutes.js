@@ -11,8 +11,8 @@ router.post('/add/repairs', async (req, res) => {
         customer_id, account_name, mobile, email, address1, address2, address3, city, staff, delivery_date, 
         place, metal, counter, entry_type, repair_no, date, metal_type, item, 
         tag_no, description, purity, category, sub_category, gross_weight, pcs, estimated_dust, estimated_amt, 
-        extra_weight, stone_value, making_charge, handling_charge, total, status, image
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        extra_weight, stone_value, making_charge, handling_charge, total, status, image, taxable_amt, total_amt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const sanitizeDecimal = (value, defaultValue = 0) => value === "" || value === null ? defaultValue : value;
@@ -23,7 +23,8 @@ router.post('/add/repairs', async (req, res) => {
       data.metal_type, data.item, data.tag_no, data.description, data.purity, data.category, data.sub_category, 
       sanitizeDecimal(data.gross_weight), sanitizeDecimal(data.pcs), sanitizeDecimal(data.estimated_dust), sanitizeDecimal(data.estimated_amt),
       sanitizeDecimal(data.extra_weight), sanitizeDecimal(data.stone_value), sanitizeDecimal(data.making_charge),
-      sanitizeDecimal(data.handling_charge), sanitizeDecimal(data.total), data.status, data.image
+      sanitizeDecimal(data.handling_charge), sanitizeDecimal(data.total), data.status, data.image, 
+      sanitizeDecimal(data.taxable_amt), sanitizeDecimal(data.total_amt) // Add these two values
     ];
 
     const [result] = await db.query(sql, values);
