@@ -6,6 +6,7 @@ const fs = require('fs');
 const db = require('../db');
 const router = express.Router();
 
+
 // Configure multer storage
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -68,14 +69,14 @@ const padNumber = (num, size) => {
 };
 
 const sanitizeNumeric = (value) => {
-    if (value === null || value === undefined || value === 'NaN') return 0;
+    if (value === null || value === undefined || value === 'NaN' || value === '') return 0;
     const num = parseFloat(value.toString().replace(/[^\d.]/g, ""));
     return isNaN(num) ? 0 : num;
 };
 
 router.post("/save-repair-details", upload.array("product_image", 10), async (req, res) => {
     try {
-        const { repairDetails, oldItems = [], memberSchemes = [], salesNetAmount } = req.body;
+        const { repairDetails, oldItems = [], memberSchemes = [], salesNetAmount, totalAmount, taxableAmount, taxAmount, netAmount, discountAmt, festivalDiscountAmt } = req.body;
 
         if (!Array.isArray(repairDetails) || repairDetails.length === 0) {
             return res.status(400).json({ message: "No data to save" });
@@ -159,53 +160,49 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             `${prefix}${padNumber(maxNumber + 1, 3)}` :
             originalInvoiceNumber;
 
-        // Calculate amounts
-        let totalAmount = 0, discountAmt = 0, festivalDiscountAmt = 0;
-        let taxableAmount = 0, taxAmount = 0, netAmount = 0;
+        // Calculate amounts - UPDATED to use selected price option values
+        // let totalAmount = 0, discountAmt = 0, festivalDiscountAmt = 0;
+        // let taxableAmount = 0, taxAmount = 0, netAmount = 0;
 
-        repairDetails.forEach((item) => {
-            const pricing = item.pricing;
-            item.finalReceiptsAmt = item.receipts_amt === "" ? 0.0 : parseFloat(item.receipts_amt) || 0.0;
-            item.finalBalAfterReceipts = item.bal_after_receipts === "" ? 0.0 : parseFloat(item.bal_after_receipts) || 0.0;
+        // repairDetails.forEach((item) => {
+        //     const pricing = item.pricing;
+        //     item.finalReceiptsAmt = item.receipts_amt === "" ? 0.0 : parseFloat(item.receipts_amt) || 0.0;
+        //     item.finalBalAfterReceipts = item.bal_after_receipts === "" ? 0.0 : parseFloat(item.bal_after_receipts) || 0.0;
 
-            const itemDiscount = parseFloat(item.disscount) || 0;
-            const itemFestivalDiscount = parseFloat(item.festival_discount) || 0;
-            const itemTax = parseFloat(item.tax_amt) || 0;
+        //     const itemDiscount = parseFloat(item.disscount) || 0;
+        //     const itemFestivalDiscount = parseFloat(item.festival_discount) || 0;
+        //     const itemTax = parseFloat(item.tax_amt) || 0;
 
-            if (pricing === "By Weight") {
-                const stonePrice = parseFloat(item.stone_price) || 0;
-                const makingCharges = parseFloat(item.making_charges) || 0;
-                const rateAmt = parseFloat(item.rate_amt) || 0;
-                const hmCharges = parseFloat(item.hm_charges) || 0;
+        //     if (pricing === "By Weight") {
+        //         // UPDATED: Use total_price which already includes the selected price option calculation
+        //         const itemTotal = parseFloat(item.total_price) || 0;
+        //         totalAmount += itemTotal;
+        //         discountAmt += itemDiscount;
+        //         festivalDiscountAmt += itemFestivalDiscount;
 
-                const itemTotal = stonePrice + makingCharges + rateAmt + hmCharges;
-                totalAmount += itemTotal;
-                discountAmt += itemDiscount;
-                festivalDiscountAmt += itemFestivalDiscount;
+        //         // UPDATED: Calculate taxable amount from total_price and tax_amt
+        //         const itemTaxable = itemTotal - itemTax;
+        //         taxableAmount += itemTaxable;
+        //         taxAmount += itemTax;
+        //         netAmount += itemTotal;
+        //     } else {
+        //         // For fixed pricing - keep existing logic
+        //         const pieceCost = parseFloat(item.pieace_cost) || 0;
+        //         const qty = parseFloat(item.qty) || 0;
 
-                const totalDiscount = itemDiscount + itemFestivalDiscount;
-                const itemTaxable = itemTotal - totalDiscount;
+        //         const itemTotal = pieceCost * qty;
+        //         totalAmount += itemTotal;
+        //         discountAmt += itemDiscount;
+        //         festivalDiscountAmt += itemFestivalDiscount;
 
-                taxableAmount += itemTaxable;
-                taxAmount += itemTax;
-                netAmount += itemTaxable + itemTax;
-            } else {
-                const pieceCost = parseFloat(item.pieace_cost) || 0;
-                const qty = parseFloat(item.qty) || 0;
+        //         const totalDiscount = itemDiscount + itemFestivalDiscount;
+        //         const itemTaxable = itemTotal - totalDiscount;
 
-                const itemTotal = pieceCost * qty;
-                totalAmount += itemTotal;
-                discountAmt += itemDiscount;
-                festivalDiscountAmt += itemFestivalDiscount;
-
-                const totalDiscount = itemDiscount + itemFestivalDiscount;
-                const itemTaxable = itemTotal - totalDiscount;
-
-                taxableAmount += itemTaxable;
-                taxAmount += itemTax;
-                netAmount += itemTaxable + itemTax;
-            }
-        });
+        //         taxableAmount += itemTaxable;
+        //         taxAmount += itemTax;
+        //         netAmount += itemTaxable + itemTax;
+        //     }
+        // });
 
         const totalOldAmount = oldItems.reduce((sum, item) => sum + (parseFloat(item.total_amount) || 0), 0);
         const parsedSalesNetAmount = parseFloat(salesNetAmount) || 0;
@@ -243,8 +240,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 }
             });
 
-            // Update existing items
-            // Update existing items
+            // Update existing items - FIXED PARAMETERS
             for (let item of itemsToUpdate) {
                 const cashAmount = parseFloat(item.cash_amount) || 0;
                 const cardAmount = parseFloat(item.card_amt) || 0;
@@ -263,7 +259,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             code=?, product_id=?, opentag_id=?, metal=?, product_name=?, metal_type=?, design_name=?, 
             purity=?, selling_purity=?, printing_purity=?, custom_purity=?, pricing=?, category=?, 
             sub_category=?, gross_weight=?, stone_weight=?, weight_bw=?, stone_price=?, va_on=?, 
-            va_percent=?, wastage_weight=?, total_weight_av=?, mc_on=?, mc_per_gram=?, making_charges=?, 
+            va_percent=?, wastage_weight=?, msp_va_percent=?, msp_wastage_weight=?, total_weight_av=?, mc_on=?, mc_per_gram=?, making_charges=?, 
             disscount_percentage=?, disscount=?, festival_discount=?, rate=?, rate_24k=?, pieace_cost=?, 
             mrp_price=?, rate_amt=?, tax_percent=?, tax_amt=?, original_total_price=?, total_price=?, 
             cash_amount=?, card_amount=?, card_amt=?, chq=?, chq_amt=?, online=?, online_amt=?, 
@@ -274,35 +270,97 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
             paid_amt=?, piece_taxable_amt=?, original_piece_taxable_amt=?
         WHERE id=?`,
                     [
-                        item.customer_id || null, item.mobile || null, item.account_name || null, item.email || null,
-                        item.address1 || null, item.address2 || null, item.city || null, item.pincode || null,
-                        item.state || null, item.state_code || null, item.aadhar_card || null, item.gst_in || null,
-                        item.pan_card || null, item.terms || null, item.date || null, currentTime,
-                        item.code || null, item.product_id || null, item.opentag_id || null, item.metal || null,
-                        item.product_name || null, item.metal_type || null, item.design_name || null,
-                        item.purity || null, item.selling_purity || null, item.printing_purity || null,
-                        item.custom_purity || null, item.pricing || null, item.category || null,
-                        item.sub_category || null, sanitizeNumeric(item.gross_weight), sanitizeNumeric(item.stone_weight),
-                        sanitizeNumeric(item.weight_bw), sanitizeNumeric(item.stone_price), item.va_on || null,
-                        sanitizeNumeric(item.va_percent), sanitizeNumeric(item.wastage_weight), sanitizeNumeric(item.total_weight_av),
-                        item.mc_on || null, sanitizeNumeric(item.mc_per_gram), sanitizeNumeric(item.making_charges),
-                        sanitizeNumeric(item.disscount_percentage), sanitizeNumeric(item.disscount), sanitizeNumeric(item.festival_discount),
-                        sanitizeNumeric(item.rate), sanitizeNumeric(item.rate_24k), sanitizeNumeric(item.pieace_cost),
-                        sanitizeNumeric(item.mrp_price), sanitizeNumeric(item.rate_amt), sanitizeNumeric(item.tax_percent),
-                        sanitizeNumeric(item.tax_amt), sanitizeNumeric(item.original_total_price), sanitizeNumeric(item.total_price),
-                        sanitizeNumeric(item.cash_amount), sanitizeNumeric(item.card_amount), sanitizeNumeric(item.card_amt),
-                        item.chq || null, sanitizeNumeric(item.chq_amt), item.online || null, sanitizeNumeric(item.online_amt),
-                        item.transaction_status || "Sales", sanitizeNumeric(item.qty), item.product_image || null,
-                        item.imagePreview || null, item.order_number || null, item.invoice || null, sanitizeNumeric(item.hm_charges),
-                        item.remarks || null, item.sale_status || null, item.invoice_number || null,
-                        taxableAmount, taxAmount, netAmount, totalOldAmount, schemesTotalAmount, parsedSalesNetAmount,
-                        item.finalReceiptsAmt, item.finalBalAfterReceipts, balAmt, roundedNetBillAmount, paidAmt,
-                        sanitizeNumeric(item.piece_taxable_amt), sanitizeNumeric(item.original_piece_taxable_amt), item.id
+                        item.customer_id || null,
+                        item.mobile || null,
+                        item.account_name || null,
+                        item.email || null,
+                        item.address1 || null,
+                        item.address2 || null,
+                        item.city || null,
+                        item.pincode || null,
+                        item.state || null,
+                        item.state_code || null,
+                        item.aadhar_card || null,
+                        item.gst_in || null,
+                        item.pan_card || null,
+                        item.terms || null,
+                        item.date || null,
+                        currentTime,
+                        item.code || null,
+                        item.product_id || null,
+                        item.opentag_id || null,
+                        item.metal || null,
+                        item.product_name || null,
+                        item.metal_type || null,
+                        item.design_name || null,
+                        item.purity || null,
+                        item.selling_purity || null,
+                        item.printing_purity || null,
+                        item.custom_purity || null,
+                        item.pricing || null,
+                        item.category || null,
+                        item.sub_category || null,
+                        sanitizeNumeric(item.gross_weight),
+                        sanitizeNumeric(item.stone_weight),
+                        sanitizeNumeric(item.weight_bw),
+                        sanitizeNumeric(item.stone_price),
+                        item.va_on || null,
+                        sanitizeNumeric(item.va_percent),
+                        sanitizeNumeric(item.wastage_weight),
+                        sanitizeNumeric(item.msp_va_percent),
+                        sanitizeNumeric(item.msp_wastage_weight),
+                        sanitizeNumeric(item.total_weight_av),
+                        item.mc_on || null,
+                        sanitizeNumeric(item.mc_per_gram),
+                        sanitizeNumeric(item.making_charges),
+                        sanitizeNumeric(item.disscount_percentage),
+                        sanitizeNumeric(item.disscount),
+                        sanitizeNumeric(item.festival_discount),
+                        sanitizeNumeric(item.rate),
+                        sanitizeNumeric(item.rate_24k),
+                        sanitizeNumeric(item.pieace_cost),
+                        sanitizeNumeric(item.mrp_price),
+                        sanitizeNumeric(item.rate_amt),
+                        sanitizeNumeric(item.tax_percent),
+                        sanitizeNumeric(item.tax_amt),
+                        sanitizeNumeric(item.original_total_price),
+                        sanitizeNumeric(item.total_price),
+                        sanitizeNumeric(item.cash_amount),
+                        sanitizeNumeric(item.card_amount),
+                        sanitizeNumeric(item.card_amt),
+                        item.chq || null,
+                        sanitizeNumeric(item.chq_amt),
+                        item.online || null,
+                        sanitizeNumeric(item.online_amt),
+                        item.transaction_status || "Sales",
+                        sanitizeNumeric(item.qty),
+                        item.product_image || null,
+                        item.imagePreview || null,
+                        item.order_number || null,
+                        item.invoice || null,
+                        sanitizeNumeric(item.hm_charges),
+                        item.remarks || null,
+                        item.sale_status || null,
+                        item.invoice_number || null,
+                        sanitizeNumeric(taxableAmount),
+                        sanitizeNumeric(taxAmount),
+                        sanitizeNumeric(netAmount),
+                        sanitizeNumeric(totalOldAmount),
+                        sanitizeNumeric(schemesTotalAmount),
+                        sanitizeNumeric(parsedSalesNetAmount),
+                        sanitizeNumeric(item.finalReceiptsAmt || 0),
+                        sanitizeNumeric(item.finalBalAfterReceipts || 0),
+                        sanitizeNumeric(balAmt),
+                        sanitizeNumeric(roundedNetBillAmount),
+                        sanitizeNumeric(paidAmt),
+                        sanitizeNumeric(item.piece_taxable_amt || 0),
+                        sanitizeNumeric(item.original_piece_taxable_amt || 0),
+                        item.id
                     ]
                 );
             }
 
-            // Insert new items
+            // Insert new items - FIXED PARAMETERS
             if (itemsToInsert.length > 0) {
                 const insertValues = itemsToInsert.map(item => {
                     const cashAmount = parseFloat(item.cash_amount) || 0;
@@ -316,41 +374,107 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                     const balAmt = roundedNetBillAmount - paidAmt;
 
                     return [
-                        item.id, item.customer_id, item.mobile, item.account_name, item.email, item.address1, item.address2,
-                        item.city, item.pincode, item.state, item.state_code, item.aadhar_card, item.gst_in, item.pan_card,
-                        item.terms, item.date, currentTime, newInvoiceNumber, item.code, item.product_id, item.opentag_id,
-                        item.metal, item.product_name, item.metal_type, item.design_name, item.purity, item.selling_purity,
-                        item.printing_purity, item.custom_purity, item.pricing, item.category, item.sub_category,
-                        item.gross_weight, item.stone_weight, item.weight_bw, item.stone_price, item.va_on, item.va_percent,
-                        item.wastage_weight, item.total_weight_av, item.mc_on, item.mc_per_gram, item.making_charges,
-                        item.disscount_percentage, item.disscount, item.festival_discount, item.rate, item.rate_24k,
-                        item.pieace_cost, item.mrp_price, item.rate_amt, sanitizeNumeric(item.tax_percent), item.tax_amt,
-                        item.original_total_price, item.total_price, item.cash_amount, item.card_amount, item.card_amt,
-                        item.chq, item.chq_amt, item.online, item.online_amt, item.transaction_status || "Sales",
-                        item.qty, item.product_image, item.imagePreview, item.order_number, item.invoice, item.hm_charges,
-                        item.remarks, item.sale_status, taxableAmount, taxAmount, netAmount, totalOldAmount,
-                        schemesTotalAmount, parsedSalesNetAmount, item.finalReceiptsAmt, item.finalBalAfterReceipts,
-                        balAmt, roundedNetBillAmount, paidAmt, sanitizeNumeric(item.piece_taxable_amt),
-                        sanitizeNumeric(item.original_piece_taxable_amt)
+                        item.customer_id || null,
+                        item.mobile || null,
+                        item.account_name || null,
+                        item.email || null,
+                        item.address1 || null,
+                        item.address2 || null,
+                        item.city || null,
+                        item.pincode || null,
+                        item.state || null,
+                        item.state_code || null,
+                        item.aadhar_card || null,
+                        item.gst_in || null,
+                        item.pan_card || null,
+                        item.terms || null,
+                        item.date || null,
+                        currentTime,
+                        newInvoiceNumber,
+                        item.code || null,
+                        item.product_id || null,
+                        item.opentag_id || null,
+                        item.metal || null,
+                        item.product_name || null,
+                        item.metal_type || null,
+                        item.design_name || null,
+                        item.purity || null,
+                        item.selling_purity || null,
+                        item.printing_purity || null,
+                        item.custom_purity || null,
+                        item.pricing || null,
+                        item.category || null,
+                        item.sub_category || null,
+                        sanitizeNumeric(item.gross_weight),
+                        sanitizeNumeric(item.stone_weight),
+                        sanitizeNumeric(item.weight_bw),
+                        sanitizeNumeric(item.stone_price),
+                        item.va_on || null,
+                        sanitizeNumeric(item.va_percent),
+                        sanitizeNumeric(item.wastage_weight),
+                        sanitizeNumeric(item.msp_va_percent),
+                        sanitizeNumeric(item.msp_wastage_weight),
+                        sanitizeNumeric(item.total_weight_av),
+                        item.mc_on || null,
+                        sanitizeNumeric(item.mc_per_gram),
+                        sanitizeNumeric(item.making_charges),
+                        sanitizeNumeric(item.disscount_percentage),
+                        sanitizeNumeric(item.disscount),
+                        sanitizeNumeric(item.festival_discount),
+                        sanitizeNumeric(item.rate),
+                        sanitizeNumeric(item.rate_24k),
+                        sanitizeNumeric(item.pieace_cost),
+                        sanitizeNumeric(item.mrp_price),
+                        sanitizeNumeric(item.rate_amt),
+                        sanitizeNumeric(item.tax_percent),
+                        sanitizeNumeric(item.tax_amt),
+                        sanitizeNumeric(item.original_total_price),
+                        sanitizeNumeric(item.total_price),
+                        sanitizeNumeric(item.cash_amount),
+                        sanitizeNumeric(item.card_amount),
+                        sanitizeNumeric(item.card_amt),
+                        item.chq || null,
+                        sanitizeNumeric(item.chq_amt),
+                        item.online || null,
+                        sanitizeNumeric(item.online_amt),
+                        item.transaction_status || "Sales",
+                        sanitizeNumeric(item.qty),
+                        item.product_image || null,
+                        item.imagePreview || null,
+                        item.order_number || null,
+                        item.invoice || null,
+                        sanitizeNumeric(item.hm_charges),
+                        item.remarks || null,
+                        item.sale_status || null,
+                        sanitizeNumeric(taxableAmount),
+                        sanitizeNumeric(taxAmount),
+                        sanitizeNumeric(netAmount),
+                        sanitizeNumeric(totalOldAmount),
+                        sanitizeNumeric(schemesTotalAmount),
+                        sanitizeNumeric(parsedSalesNetAmount),
+                        sanitizeNumeric(item.finalReceiptsAmt || 0),
+                        sanitizeNumeric(item.finalBalAfterReceipts || 0),
+                        sanitizeNumeric(balAmt),
+                        sanitizeNumeric(roundedNetBillAmount),
+                        sanitizeNumeric(paidAmt),
+                        sanitizeNumeric(item.piece_taxable_amt || 0),
+                        sanitizeNumeric(item.original_piece_taxable_amt || 0)
                     ];
                 });
 
                 await db.query(`
-          INSERT INTO sale_details (
-            id, customer_id, mobile, account_name, email, address1, address2, city, pincode, state, state_code, 
+        INSERT INTO sale_details (
+            customer_id, mobile, account_name, email, address1, address2, city, pincode, state, state_code, 
             aadhar_card, gst_in, pan_card, terms, date, time, invoice_number, code, product_id, opentag_id, metal, 
             product_name, metal_type, design_name, purity, selling_purity, printing_purity, custom_purity, pricing, category, sub_category, 
-            gross_weight, stone_weight, weight_bw, stone_price, va_on, va_percent, wastage_weight, total_weight_av, 
+            gross_weight, stone_weight, weight_bw, stone_price, va_on, va_percent, wastage_weight, msp_va_percent, msp_wastage_weight, total_weight_av, 
             mc_on, mc_per_gram, making_charges, disscount_percentage, disscount, festival_discount, rate, rate_24k, pieace_cost, mrp_price, 
             rate_amt, tax_percent, tax_amt, original_total_price, total_price, cash_amount, card_amount, card_amt, 
             chq, chq_amt, online, online_amt, transaction_status, qty, product_image, imagePreview, order_number, 
             invoice, hm_charges, remarks, sale_status, taxable_amount, tax_amount, net_amount, old_exchange_amt, 
             scheme_amt, sale_return_amt, receipts_amt, bal_after_receipts, bal_amt, net_bill_amount, paid_amt, 
             piece_taxable_amt, original_piece_taxable_amt
-          ) VALUES ?`, [insertValues]);
-
-                // Handle opening_tags_entry insertion for items with opentag_id = 0 or null
-                await handleOpeningTagsEntry(itemsToInsert, newInvoiceNumber);
+        ) VALUES ?`, [insertValues]);
             }
 
             // Update repairs table - FIXED: Proper handling of IN clause
@@ -377,31 +501,101 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 const balAmt = roundedNetBillAmount - paidAmt;
 
                 return [
-                    item.id, item.customer_id, item.mobile, item.account_name, item.email, item.address1, item.address2,
-                    item.city, item.pincode, item.state, item.state_code, item.aadhar_card, item.gst_in, item.pan_card,
-                    item.terms, item.date, currentTime, newInvoiceNumber, item.code, item.product_id, item.opentag_id,
-                    item.metal, item.product_name, item.metal_type, item.design_name, item.purity, item.selling_purity,
-                    item.printing_purity, item.custom_purity, item.pricing, item.category, item.sub_category,
-                    item.gross_weight, item.stone_weight, item.weight_bw, item.stone_price, item.va_on, item.va_percent,
-                    item.wastage_weight, item.total_weight_av, item.mc_on, item.mc_per_gram, item.making_charges,
-                    item.disscount_percentage, item.disscount, item.festival_discount, item.rate, item.rate_24k,
-                    item.pieace_cost, item.mrp_price, item.rate_amt, sanitizeNumeric(item.tax_percent), item.tax_amt,
-                    item.original_total_price, item.total_price, item.cash_amount, item.card_amount, item.card_amt,
-                    item.chq, item.chq_amt, item.online, item.online_amt, item.transaction_status || "Sales",
-                    item.qty, item.product_image, item.imagePreview, item.order_number, item.invoice, item.hm_charges,
-                    item.remarks, item.sale_status, taxableAmount, taxAmount, netAmount, totalOldAmount,
-                    schemesTotalAmount, parsedSalesNetAmount, item.finalReceiptsAmt, item.finalBalAfterReceipts,
-                    balAmt, roundedNetBillAmount, paidAmt, sanitizeNumeric(item.piece_taxable_amt),
+                    item.customer_id,
+                    item.mobile,
+                    item.account_name,
+                    item.email,
+                    item.address1,
+                    item.address2,
+                    item.city,
+                    item.pincode,
+                    item.state,
+                    item.state_code,
+                    item.aadhar_card,
+                    item.gst_in,
+                    item.pan_card,
+                    item.terms,
+                    item.date,
+                    currentTime,
+                    newInvoiceNumber,
+                    item.code,
+                    item.product_id,
+                    item.opentag_id,
+                    item.metal,
+                    item.product_name,
+                    item.metal_type,
+                    item.design_name,
+                    item.purity,
+                    item.selling_purity,
+                    item.printing_purity,
+                    item.custom_purity,
+                    item.pricing,
+                    item.category,
+                    item.sub_category,
+                    sanitizeNumeric(item.gross_weight),
+                    sanitizeNumeric(item.stone_weight),
+                    sanitizeNumeric(item.weight_bw),
+                    sanitizeNumeric(item.stone_price),
+                    item.va_on,
+                    sanitizeNumeric(item.va_percent),
+                    sanitizeNumeric(item.wastage_weight),
+                    sanitizeNumeric(item.msp_va_percent),
+                    sanitizeNumeric(item.msp_wastage_weight),
+                    sanitizeNumeric(item.total_weight_av),
+                    item.mc_on,
+                    sanitizeNumeric(item.mc_per_gram),
+                    sanitizeNumeric(item.making_charges),
+                    sanitizeNumeric(item.disscount_percentage),
+                    sanitizeNumeric(item.disscount),
+                    sanitizeNumeric(item.festival_discount),
+                    sanitizeNumeric(item.rate),
+                    sanitizeNumeric(item.rate_24k),
+                    sanitizeNumeric(item.pieace_cost),
+                    sanitizeNumeric(item.mrp_price),
+                    sanitizeNumeric(item.rate_amt),
+                    sanitizeNumeric(item.tax_percent),
+                    sanitizeNumeric(item.tax_amt),
+                    sanitizeNumeric(item.original_total_price),
+                    sanitizeNumeric(item.total_price),
+                    sanitizeNumeric(item.cash_amount),
+                    sanitizeNumeric(item.card_amount),
+                    sanitizeNumeric(item.card_amt),
+                    item.chq,
+                    sanitizeNumeric(item.chq_amt),
+                    item.online,
+                    sanitizeNumeric(item.online_amt),
+                    item.transaction_status || "Sales",
+                    sanitizeNumeric(item.qty),
+                    item.product_image,
+                    item.imagePreview,
+                    item.order_number,
+                    item.invoice,
+                    sanitizeNumeric(item.hm_charges),
+                    item.remarks,
+                    item.sale_status,
+                    sanitizeNumeric(taxableAmount),
+                    sanitizeNumeric(taxAmount),
+                    sanitizeNumeric(netAmount),
+                    sanitizeNumeric(totalOldAmount),
+                    sanitizeNumeric(schemesTotalAmount),
+                    sanitizeNumeric(parsedSalesNetAmount),
+                    sanitizeNumeric(item.finalReceiptsAmt),
+                    sanitizeNumeric(item.finalBalAfterReceipts),
+                    sanitizeNumeric(balAmt),
+                    sanitizeNumeric(roundedNetBillAmount),
+                    sanitizeNumeric(paidAmt),
+                    sanitizeNumeric(item.piece_taxable_amt),
                     sanitizeNumeric(item.original_piece_taxable_amt)
                 ];
+
             });
 
             await db.query(`
         INSERT INTO sale_details (
-          id, customer_id, mobile, account_name, email, address1, address2, city, pincode, state, state_code, 
+          customer_id, mobile, account_name, email, address1, address2, city, pincode, state, state_code, 
           aadhar_card, gst_in, pan_card, terms, date, time, invoice_number, code, product_id, opentag_id, metal, 
           product_name, metal_type, design_name, purity, selling_purity, printing_purity, custom_purity, pricing, category, sub_category, 
-          gross_weight, stone_weight, weight_bw, stone_price, va_on, va_percent, wastage_weight, total_weight_av, 
+          gross_weight, stone_weight, weight_bw, stone_price, va_on, va_percent, wastage_weight, msp_va_percent, msp_wastage_weight, total_weight_av, 
           mc_on, mc_per_gram, making_charges, disscount_percentage, disscount, festival_discount, rate, rate_24k, pieace_cost, mrp_price, 
           rate_amt, tax_percent, tax_amt, original_total_price, total_price, cash_amount, card_amount, card_amt, 
           chq, chq_amt, online, online_amt, transaction_status, qty, product_image, imagePreview, order_number, 
@@ -438,27 +632,28 @@ async function handleOpeningTagsEntry(items, invoiceNumber) {
         // Check if opentag_id is 0 or null/undefined
         if (!item.opentag_id || item.opentag_id === 0) {
             try {
-                // Insert into opening_tags_entry - FIXED: Added missing comma after PCode_BarCode
+                // Insert into opening_tags_entry - UPDATED: Added MSP wastage fields
                 const [opentagResult] = await db.execute(`
                     INSERT INTO opening_tags_entry (
-                        product_id, sub_category, Pricing, metal_type, Purity, PCode_BarCode,
+                        product_id, sub_category, Pricing, metal_type, Purity,
                         Gross_Weight, Stones_Weight, Weight_BW, Wastage_On, Wastage_Percentage, WastageWeight, 
-                        TotalWeight_AW, MC_Per_Gram, Making_Charges_on, Making_Charges, Stones_Price, design_master, 
+                        msp_Wastage_Percentage, msp_WastageWeight, TotalWeight_AW, MC_Per_Gram, Making_Charges_on, Making_Charges, Stones_Price, design_master, 
                         category, pieace_cost, pcs, Status
-                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `, [
                     item.product_id || null,
                     item.product_name || null,
                     item.pricing || null,
                     item.metal_type || null,
                     item.purity || null,
-                    item.code || null,
                     sanitizeNumeric(item.gross_weight),
                     sanitizeNumeric(item.stone_weight),
                     sanitizeNumeric(item.weight_bw),
                     item.va_on || null,
                     sanitizeNumeric(item.va_percent),
                     sanitizeNumeric(item.wastage_weight),
+                    sanitizeNumeric(item.msp_va_percent),  // ADDED: MSP wastage percentage
+                    sanitizeNumeric(item.msp_wastage_weight), // ADDED: MSP wastage weight
                     sanitizeNumeric(item.total_weight_av),
                     sanitizeNumeric(item.mc_per_gram),
                     item.mc_on || null,
@@ -466,7 +661,7 @@ async function handleOpeningTagsEntry(items, invoiceNumber) {
                     sanitizeNumeric(item.stone_price),
                     item.design_name || null,
                     item.category || null,
-                    sanitizeNumeric(item.piece_cost),
+                    sanitizeNumeric(item.pieace_cost), // FIXED: Changed from piece_cost to pieace_cost
                     sanitizeNumeric(item.qty),
                     'Sold'
                 ]);
@@ -721,6 +916,8 @@ router.get("/get-repair-details/:invoice_number", async (req, res) => {
             va_on: row.va_on,
             va_percent: row.va_percent,
             wastage_weight: row.wastage_weight,
+            msp_va_percent: row.msp_va_percent,
+            msp_wastage_weight: row.msp_wastage_weight,
             total_weight_av: row.total_weight_av,
             mc_on: row.mc_on,
             mc_per_gram: row.mc_per_gram,
@@ -811,122 +1008,128 @@ router.get("/get/repair-details", async (req, res) => {
     }
 });
 
-router.delete('/repair-details/:invoiceNumber', async (req, res) => {
-    const { invoiceNumber } = req.params;
-    const { skipMessage } = req.query;
+// router.delete('/repair-details/:invoiceNumber', async (req, res) => {
+//     const { invoiceNumber } = req.params;
+//     const { skipMessage } = req.query;
 
-    if (!invoiceNumber) {
-        return res.status(400).json({ message: 'Invoice number is required' });
-    }
+//     if (!invoiceNumber) {
+//         return res.status(400).json({ message: 'Invoice number is required' });
+//     }
 
-    let connection;
-    try {
-        // Get connection for transaction
-        connection = await db.getConnection();
-        await connection.beginTransaction();
+//     let connection;
+//     try {
+//         // Get connection for transaction
+//         connection = await db.getConnection();
+//         await connection.beginTransaction();
 
+//         // 1️⃣ Get sale details with transaction status
+//         const [saleDetails] = await connection.execute(
+//             `SELECT opentag_id, product_id, qty, gross_weight, transaction_status 
+//        FROM sale_details 
+//        WHERE invoice_number = ?`,
+//             [invoiceNumber]
+//         );
 
-        // 1️⃣ Get sale details with transaction status
-        const [saleDetails] = await connection.execute(
-            `SELECT opentag_id, product_id, qty, gross_weight, transaction_status 
-       FROM sale_details 
-       WHERE invoice_number = ?`,
-            [invoiceNumber]
-        );
+//         if (saleDetails.length === 0) {
+//             await connection.rollback();
+//             return res.status(404).json({ message: 'No sale details found for this invoice' });
+//         }
 
-        if (saleDetails.length === 0) {
-            await connection.rollback();
-            return res.status(404).json({ message: 'No sale details found for this invoice' });
-        }
+//         const transactionStatus = saleDetails[0].transaction_status;
+//         const validStatuses = ['Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice'];
 
+//         if (!validStatuses.includes(transactionStatus)) {
+//             await connection.rollback();
+//             return res.status(400).json({
+//                 message: `Cannot delete invoice with transaction status: ${transactionStatus}`
+//             });
+//         }
 
-        const transactionStatus = saleDetails[0].transaction_status;
-        const validStatuses = ['Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice'];
+//         // 2️⃣ If transaction status is 'Sales', update product quantities
+//         if (transactionStatus === 'Sales') {
+//             const opentagIds = saleDetails.map(row => row.opentag_id).filter(id => id);
 
-        if (!validStatuses.includes(transactionStatus)) {
-            await connection.rollback();
-            return res.status(400).json({
-                message: `Cannot delete invoice with transaction status: ${transactionStatus}`
-            });
-        }
+//             // Update products
+//             for (const detail of saleDetails) {
+//                 if (detail.product_id) {
+//                     await connection.execute(
+//                         `UPDATE product 
+//              SET 
+//                sale_qty = sale_qty - ?,
+//                sale_weight = sale_weight - ?,
+//                bal_qty = pur_qty - sale_qty,
+//                bal_weight = pur_weight - sale_weight
+//              WHERE product_id = ?`,
+//                         [detail.qty || 0, detail.gross_weight || 0, detail.product_id]
+//                     );
+//                 }
+//             }
 
-        // 2️⃣ If transaction status is 'Sales', update product quantities
-        if (transactionStatus === 'Sales') {
-            const opentagIds = saleDetails.map(row => row.opentag_id).filter(id => id);
+//             // 3️⃣ Update opening_tags_entry status if opentagIds exist
+//             if (opentagIds.length > 0) {
+//                 const placeholders = opentagIds.map(() => '?').join(',');
+//                 await connection.execute(
+//                     `UPDATE opening_tags_entry SET Status = 'Available' WHERE opentag_id IN (${placeholders})`,
+//                     opentagIds
+//                 );
+//             }
+//         }
 
-            // Update products
-            for (const detail of saleDetails) {
-                if (detail.product_id) {
-                    await connection.execute(
-                        `UPDATE product 
-             SET 
-               sale_qty = sale_qty - ?,
-               sale_weight = sale_weight - ?,
-               bal_qty = pur_qty - sale_qty,
-               bal_weight = pur_weight - sale_weight
-             WHERE product_id = ?`,
-                        [detail.qty || 0, detail.gross_weight || 0, detail.product_id]
-                    );
+//         // 4️⃣ Delete old_items
+//         await connection.execute(
+//             'DELETE FROM old_items WHERE invoice_id = ?',
+//             [invoiceNumber]
+//         );
 
-                }
-            }
+//         // 5️⃣ Delete sale_details
+//         const [deleteResult] = await connection.execute(
+//             `DELETE FROM sale_details 
+//        WHERE invoice_number = ? 
+//        AND transaction_status IN ('Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice')`,
+//             [invoiceNumber]
+//         );
 
-            // 3️⃣ Update opening_tags_entry status if opentagIds exist
-            if (opentagIds.length > 0) {
-                const placeholders = opentagIds.map(() => '?').join(',');
-                await connection.execute(
-                    `UPDATE opening_tags_entry SET Status = 'Available' WHERE opentag_id IN (${placeholders})`,
-                    opentagIds
-                );
+//         // 6️⃣ Delete the PDF file after successful database operations
+//         try {
+//             const pdfPath = path.join(__dirname, '../uploads/invoices', `${invoiceNumber}.pdf`);
+//             await fs.access(pdfPath); // Check if file exists
+//             await fs.unlink(pdfPath); // Delete the file
+//             console.log(`PDF file deleted: ${invoiceNumber}.pdf`);
+//         } catch (fileError) {
+//             // File doesn't exist or couldn't be deleted - log but don't fail the operation
+//             console.log(`PDF file not found or couldn't be deleted: ${invoiceNumber}.pdf`, fileError.message);
+//         }
 
-            }
-        }
+//         // Commit transaction
+//         await connection.commit();
 
-        // 4️⃣ Delete old_items
-        await connection.execute(
-            'DELETE FROM old_items WHERE invoice_id = ?',
-            [invoiceNumber]
-        );
+//         if (skipMessage === 'true') {
+//             return res.sendStatus(204);
+//         }
 
+//         res.status(200).json({
+//             message: 'Sale details deleted successfully',
+//             deletedRows: deleteResult.affectedRows
+//         });
 
-        // 5️⃣ Delete sale_details
-        const [deleteResult] = await connection.execute(
-            `DELETE FROM sale_details 
-       WHERE invoice_number = ? 
-       AND transaction_status IN ('Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice')`,
-            [invoiceNumber]
-        );
-
-
-        // Commit transaction
-        await connection.commit();
-
-        if (skipMessage === 'true') {
-            return res.sendStatus(204);
-        }
-
-        res.status(200).json({
-            message: 'Sale details deleted successfully',
-            deletedRows: deleteResult.affectedRows
-        });
-
-    } catch (error) {
-        // Rollback transaction in case of error
-        if (connection) {
-            await connection.rollback();
-        }
-        console.error('Error deleting repair details:', error);
-        res.status(500).json({
-            message: 'Failed to delete sale details',
-            error: error.message
-        });
-    } finally {
-        // Release connection back to pool
-        if (connection) {
-            connection.release();
-        }
-    }
-});
+//     } catch (error) {
+//         // Rollback transaction in case of error
+//         if (connection) {
+//             await connection.rollback();
+//         }
+//         console.error('Error deleting repair details:', error);
+//         res.status(500).json({
+//             message: 'Failed to delete sale details',
+//             error: error.message
+//         });
+//     } finally {
+//         // Release connection back to pool
+//         if (connection) {
+//             connection.release();
+//         }
+//     }
+// });
 
 module.exports = router;
+
 

@@ -1,5 +1,7 @@
 const express = require('express');
 const db = require('../db');
+const fs = require('fs').promises;
+const path = require('path');
 
 const router = express.Router();
 
@@ -25,7 +27,7 @@ router.post('/post/receipts', async (req, res) => {
         const modeValue = mode && mode.trim() !== '' ? mode : null;
         const chequeNumberValue = cheque_number && cheque_number.trim() !== '' ? cheque_number : null;
         const remarksValue = remarks && remarks.trim() !== '' ? remarks : null;
-        
+
         // Convert numeric values to proper numbers (0 instead of undefined)
         const totalAmtValue = total_amt ? Number(total_amt) : 0;
         const discountAmtValue = discount_amt ? Number(discount_amt) : 0;
@@ -36,21 +38,21 @@ router.post('/post/receipts', async (req, res) => {
 
         // Prepare data for payment insertion - ensure no undefined values
         const paymentData = [
-            transaction_type, 
-            date, 
-            modeValue, 
-            chequeNumberValue, 
+            transaction_type,
+            date,
+            modeValue,
+            chequeNumberValue,
             receipt_no,
-            account_name, 
-            invoice_number, 
-            totalAmtValue, 
-            discountAmtValue, 
+            account_name,
+            invoice_number,
+            totalAmtValue,
+            discountAmtValue,
             cashAmtValue,
-            remarksValue, 
-            totalWtValue, 
-            paidWtValue, 
-            balWtValue, 
-            category || null, 
+            remarksValue,
+            totalWtValue,
+            paidWtValue,
+            balWtValue,
+            category || null,
             mobile || null
         ];
 
@@ -279,9 +281,9 @@ router.delete('/delete/receipt/:id', async (req, res) => {
         await connection.beginTransaction();
 
         try {
-            // Get the invoice_number and discount_amt of the payment to be deleted
+            // Get the invoice_number, discount_amt, and receipt_no of the payment to be deleted
             const [paymentRecord] = await connection.execute(
-                'SELECT invoice_number, discount_amt FROM receipts WHERE id = ?',
+                'SELECT invoice_number, discount_amt, receipt_no FROM receipts WHERE id = ?',
                 [id]
             );
 
@@ -291,7 +293,7 @@ router.delete('/delete/receipt/:id', async (req, res) => {
                 return res.status(404).json({ error: 'Payment record not found.' });
             }
 
-            const { invoice_number, discount_amt } = paymentRecord[0];
+            const { invoice_number, discount_amt, receipt_no } = paymentRecord[0];
 
             // Update sale_details with new receipts_amt and bal_after_receipts
             const updateRepairDetailsQuery = `
@@ -309,6 +311,19 @@ router.delete('/delete/receipt/:id', async (req, res) => {
                 await connection.rollback();
                 connection.release();
                 return res.status(404).json({ error: 'Payment record not found.' });
+            }
+
+            // Delete the PDF file if it exists
+            if (receipt_no) {
+                try {
+                    const pdfPath = path.join(__dirname, '../uploads/invoices', `${receipt_no}.pdf`);
+                    await fs.access(pdfPath); // Check if file exists
+                    await fs.unlink(pdfPath); // Delete the file
+                    // console.log(`PDF file deleted: ${receipt_no}.pdf`);
+                } catch (fileError) {
+                    // File doesn't exist or couldn't be deleted - log but don't fail the operation
+                    console.log(`PDF file not found or couldn't be deleted: ${receipt_no}.pdf`, fileError.message);
+                }
             }
 
             await connection.commit();
@@ -605,14 +620,137 @@ router.get("/account-names", async (req, res) => {
             FROM account_details
             WHERE account_group IN (?, ?, ?, ?, ?, ?)
         `;
-        
+
         const [results] = await db.execute(query, accountGroups);
-        
+
         // Return both account_name and mobile
         res.json(results);
     } catch (err) {
         console.error("Error fetching account names: ", err);
         res.status(500).send({ error: "Database query error" });
+    }
+});
+
+
+router.delete('/repair-details/:invoiceNumber', async (req, res) => {
+    const { invoiceNumber } = req.params;
+    const { skipMessage } = req.query;
+
+    if (!invoiceNumber) {
+        return res.status(400).json({ message: 'Invoice number is required' });
+    }
+
+    let connection;
+    try {
+        // Get connection for transaction
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        // 1️⃣ Get sale details with transaction status
+        const [saleDetails] = await connection.execute(
+            `SELECT opentag_id, product_id, qty, gross_weight, transaction_status 
+       FROM sale_details 
+       WHERE invoice_number = ?`,
+            [invoiceNumber]
+        );
+
+        if (saleDetails.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'No sale details found for this invoice' });
+        }
+
+        const transactionStatus = saleDetails[0].transaction_status;
+        const validStatuses = ['Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice'];
+
+        if (!validStatuses.includes(transactionStatus)) {
+            await connection.rollback();
+            return res.status(400).json({
+                message: `Cannot delete invoice with transaction status: ${transactionStatus}`
+            });
+        }
+
+        // 2️⃣ If transaction status is 'Sales', update product quantities
+        if (transactionStatus === 'Sales') {
+            const opentagIds = saleDetails.map(row => row.opentag_id).filter(id => id);
+
+            // Update products
+            for (const detail of saleDetails) {
+                if (detail.product_id) {
+                    await connection.execute(
+                        `UPDATE product 
+             SET 
+               sale_qty = sale_qty - ?,
+               sale_weight = sale_weight - ?,
+               bal_qty = pur_qty - sale_qty,
+               bal_weight = pur_weight - sale_weight
+             WHERE product_id = ?`,
+                        [detail.qty || 0, detail.gross_weight || 0, detail.product_id]
+                    );
+                }
+            }
+
+            // 3️⃣ Update opening_tags_entry status if opentagIds exist
+            if (opentagIds.length > 0) {
+                const placeholders = opentagIds.map(() => '?').join(',');
+                await connection.execute(
+                    `UPDATE opening_tags_entry SET Status = 'Available' WHERE opentag_id IN (${placeholders})`,
+                    opentagIds
+                );
+            }
+        }
+
+        // 4️⃣ Delete old_items
+        await connection.execute(
+            'DELETE FROM old_items WHERE invoice_id = ?',
+            [invoiceNumber]
+        );
+
+        // 5️⃣ Delete sale_details
+        const [deleteResult] = await connection.execute(
+            `DELETE FROM sale_details 
+       WHERE invoice_number = ? 
+       AND transaction_status IN ('Sales', 'ConvertedInvoice', 'ConvertedRepairInvoice')`,
+            [invoiceNumber]
+        );
+
+        // 6️⃣ Delete the PDF file after successful database operations
+        try {
+            const pdfPath = path.join(__dirname, '../uploads/invoices', `${invoiceNumber}.pdf`);
+            await fs.access(pdfPath); // Check if file exists
+            await fs.unlink(pdfPath); // Delete the file
+            // console.log(`PDF file deleted: ${invoiceNumber}.pdf`);
+        } catch (fileError) {
+            // File doesn't exist or couldn't be deleted - log but don't fail the operation
+            console.log(`PDF file not found or couldn't be deleted: ${invoiceNumber}.pdf`, fileError.message);
+        }
+
+        // Commit transaction
+        await connection.commit();
+
+        if (skipMessage === 'true') {
+            return res.sendStatus(204);
+        }
+
+        res.status(200).json({
+            message: 'Sale details deleted successfully',
+            deletedRows: deleteResult.affectedRows
+        });
+
+    } catch (error) {
+        // Rollback transaction in case of error
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error('Error deleting repair details:', error);
+        res.status(500).json({
+            message: 'Failed to delete sale details',
+            error: error.message
+        });
+    } finally {
+        // Release connection back to pool
+        if (connection) {
+            connection.release();
+        }
     }
 });
 

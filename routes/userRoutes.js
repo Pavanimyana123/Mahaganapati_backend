@@ -4,20 +4,31 @@ const db = require('../db');
 
 // Create user
 router.post('/users', async (req, res) => {
-  const { user_name, email, phone_number, role, password, retype_password } = req.body;
+  const { user_name, email, phone_number, role, user_type_id, password, retype_password } = req.body;
+
   if (password !== retype_password) {
     return res.status(400).json({ message: "Passwords do not match" });
   }
+
   try {
     const query = `
-      INSERT INTO users (user_name, email, phone_number, role, password, retype_password)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (user_name, email, phone_number, role, user_type_id, password, retype_password)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await db.query(query, [user_name, email, phone_number, role, password, retype_password]);
+    const [result] = await db.query(query, [
+      user_name,
+      email,
+      phone_number,
+      role,
+      user_type_id,
+      password,
+      retype_password
+    ]);
+
     res.status(201).json({ message: 'User created successfully', userId: result.insertId });
   } catch (err) {
     console.error('Error inserting user:', err.message);
-    res.status(500).json({ message: 'Error inserting user' });
+    res.status(500).json({ message: 'Error inserting user', error: err.message });
   }
 });
 
@@ -50,22 +61,34 @@ router.get('/users/:id', async (req, res) => {
 // Update user
 router.put('/users/:id', async (req, res) => {
   const { id } = req.params;
-  const { user_name, email, phone_number, role } = req.body;
+  const { user_name, email, phone_number, role, user_type_id } = req.body;
 
   try {
-    const [result] = await db.query(
-      'UPDATE users SET user_name = ?, email = ?, phone_number = ?, role = ? WHERE id = ?',
-      [user_name, email, phone_number, role, id]
-    );
+    const query = `
+      UPDATE users
+      SET user_name = ?, email = ?, phone_number = ?, role = ?, user_type_id = ?
+      WHERE id = ?
+    `;
+    const [result] = await db.query(query, [
+      user_name,
+      email,
+      phone_number,
+      role,
+      user_type_id,
+      id
+    ]);
+
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
+
     res.status(200).json({ message: 'User updated successfully' });
   } catch (err) {
     console.error('Error updating user:', err.message);
-    res.status(500).json({ message: 'Error updating user' });
+    res.status(500).json({ message: 'Error updating user', error: err.message });
   }
 });
+
 
 // Delete user
 router.delete('/users/:id', async (req, res) => {

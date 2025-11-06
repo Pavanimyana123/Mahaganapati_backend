@@ -32,10 +32,12 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const receiptRoutes = require('./routes/receiptRoutes');
 const repairInvoiceRoutes = require('./routes/repairInvoiceRoutes');
 const offerRoutes = require('./routes/offerRoutes');
+const wastageRoutes = require('./routes/wastageRoutes');
+const userRoleRoutes = require('./routes/userRoleRoutes');
 
 
 const app = express();
-const PORT = 5000;
+const PORT = 5001;
 
 // Middleware
 app.use(cors());
@@ -47,6 +49,7 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 // Define routes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use("/invoices", express.static(path.join(__dirname, "uploads/invoices")));
+app.use("/estimates", express.static(path.join(__dirname, "uploads/estimates")));
 
 app.use('/', usersRoutes);
 app.use('/', loginRoutes);
@@ -76,6 +79,8 @@ app.use('/', invoiceRoutes);
 app.use('/', receiptRoutes);
 app.use('/', repairInvoiceRoutes);
 app.use('/', offerRoutes);
+app.use('/', wastageRoutes);
+app.use('/', userRoleRoutes);
 
 
 // Start the server
