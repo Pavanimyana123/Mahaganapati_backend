@@ -108,8 +108,8 @@ router.post('/post/opening-tags-entry', async (req, res) => {
       HUID_No,
       Wastage_On,
       Wastage_Percentage: sanitizeValue(Wastage_Percentage),
-      msp_Wastage_Percentage : sanitizeValue(msp_Wastage_Percentage),
-      msp_WastageWeight : sanitizeValue(msp_WastageWeight),
+      msp_Wastage_Percentage: sanitizeValue(msp_Wastage_Percentage),
+      msp_WastageWeight: sanitizeValue(msp_WastageWeight),
       Weight_BW: sanitizeValue(Weight_BW),
       MC_Per_Gram: sanitizeValue(MC_Per_Gram),
       Making_Charges_On: sanitizeValue(Making_Charges_On),
@@ -155,7 +155,7 @@ router.post('/post/opening-tags-entry', async (req, res) => {
     // Check for existing PCode_BarCode with the same Prefix
     const checkSql = "SELECT PCode_BarCode FROM opening_tags_entry WHERE PCode_BarCode LIKE ? ORDER BY PCode_BarCode DESC LIMIT 1";
     const prefixPattern = data.Prefix + "%";
-    
+
     const [checkResult] = await db.execute(checkSql, [prefixPattern]);
 
     let startNumber = 1;
@@ -186,20 +186,20 @@ router.post('/post/opening-tags-entry', async (req, res) => {
     ) VALUES ?`;
 
     const values = insertEntries.map(entry => [
-      entry.tag_id, entry.product_id, entry.account_name, entry.invoice, entry.Pricing, entry.cut, 
-      entry.color, entry.clarity, entry.subcategory_id, entry.sub_category, entry.design_master, 
-      entry.Prefix, entry.category, entry.Purity, entry.metal_type, entry.PCode_BarCode, 
-      entry.Gross_Weight, entry.Stones_Weight, entry.deduct_st_Wt, entry.Stones_Price, 
-      entry.WastageWeight, entry.HUID_No, entry.Wastage_On, entry.Wastage_Percentage, entry.msp_Wastage_Percentage,entry.msp_WastageWeight,
-      entry.Weight_BW, entry.MC_Per_Gram, entry.Making_Charges_On, entry.TotalWeight_AW, 
-      entry.Making_Charges, entry.Status, entry.Source, entry.Stock_Point, entry.pieace_cost, 
-      entry.product_Name, entry.making_on, entry.selling_price, entry.dropdown, entry.qr_status, 
-      entry.stone_price_per_carat, entry.pur_Gross_Weight, entry.pur_Stones_Weight, 
-      entry.pur_deduct_st_Wt, entry.pur_stone_price_per_carat, entry.pur_Stones_Price, 
-      entry.pur_Weight_BW, entry.pur_Making_Charges_On, entry.pur_MC_Per_Gram, entry.pur_Making_Charges, 
-      entry.pur_Wastage_On, entry.pur_Wastage_Percentage, entry.pur_WastageWeight, entry.pur_TotalWeight_AW, 
-      entry.tag_weight, entry.size, entry.pcs, entry.image, entry.tax_percent, entry.mrp_price, 
-      entry.total_pcs_cost, entry.pur_rate_cut, entry.pur_Purity, entry.pur_purityPercentage, 
+      entry.tag_id, entry.product_id, entry.account_name, entry.invoice, entry.Pricing, entry.cut,
+      entry.color, entry.clarity, entry.subcategory_id, entry.sub_category, entry.design_master,
+      entry.Prefix, entry.category, entry.Purity, entry.metal_type, entry.PCode_BarCode,
+      entry.Gross_Weight, entry.Stones_Weight, entry.deduct_st_Wt, entry.Stones_Price,
+      entry.WastageWeight, entry.HUID_No, entry.Wastage_On, entry.Wastage_Percentage, entry.msp_Wastage_Percentage, entry.msp_WastageWeight,
+      entry.Weight_BW, entry.MC_Per_Gram, entry.Making_Charges_On, entry.TotalWeight_AW,
+      entry.Making_Charges, entry.Status, entry.Source, entry.Stock_Point, entry.pieace_cost,
+      entry.product_Name, entry.making_on, entry.selling_price, entry.dropdown, entry.qr_status,
+      entry.stone_price_per_carat, entry.pur_Gross_Weight, entry.pur_Stones_Weight,
+      entry.pur_deduct_st_Wt, entry.pur_stone_price_per_carat, entry.pur_Stones_Price,
+      entry.pur_Weight_BW, entry.pur_Making_Charges_On, entry.pur_MC_Per_Gram, entry.pur_Making_Charges,
+      entry.pur_Wastage_On, entry.pur_Wastage_Percentage, entry.pur_WastageWeight, entry.pur_TotalWeight_AW,
+      entry.tag_weight, entry.size, entry.pcs, entry.image, entry.tax_percent, entry.mrp_price,
+      entry.total_pcs_cost, entry.pur_rate_cut, entry.pur_Purity, entry.pur_purityPercentage,
       entry.printing_purity
     ]);
 
@@ -225,11 +225,11 @@ router.get('/get/opening-tags-entry', async (req, res) => {
   try {
     const sql = `SELECT * FROM opening_tags_entry`;
     const [result] = await db.execute(sql);
-    
+
     if (result.length === 0) {
       return res.status(404).json({ message: "No data found" });
     }
-    
+
     res.status(200).json({ message: "Data retrieved successfully", result });
   } catch (err) {
     console.error("Database error:", err);
@@ -243,43 +243,63 @@ router.put('/update/opening-tags-entry/:id', async (req, res) => {
     const { id } = req.params;
     let updatedData = req.body;
 
-    // Handle empty strings for fields that expect decimals
-    if (updatedData.Making_Charges === '') {
-      updatedData.Making_Charges = null;
-    }
+    // 🔹 Sanitize numeric/decimal fields to avoid empty string errors
+    const decimalFields = [
+      "Gross_Weight", "Stones_Weight", "Stones_Price", "Weight_BW",
+      "WastageWeight", "Wastage_Percentage", "msp_Wastage_Percentage",
+      "msp_WastageWeight", "MC_Per_Gram", "Making_Charges",
+      "TotalWeight_AW", "selling_price", "pieace_cost", "stone_price_per_carat",
+      "pur_rate_cut", "pur_Gross_Weight", "pur_Stones_Weight",
+      "pur_stone_price_per_carat", "pur_Stones_Price", "pur_Weight_BW",
+      "pur_MC_Per_Gram", "pur_Making_Charges", "pur_Wastage_Percentage",
+      "pur_WastageWeight", "pur_TotalWeight_AW", "tax_percent",
+      "mrp_price", "total_pcs_cost"
+    ];
 
-    // Convert 'added_at' field to MySQL-compatible format if it exists
+    decimalFields.forEach(field => {
+      if (updatedData[field] === "" || updatedData[field] === null || updatedData[field] === undefined) {
+        updatedData[field] = 0;
+      }
+    });
+
+    // 🔹 Convert 'added_at' to MySQL-compatible format if it exists
     if (updatedData.added_at) {
       updatedData.added_at = moment(updatedData.added_at).format('YYYY-MM-DD HH:mm:ss');
     }
 
-    // Step 1: Fetch the current `product_id` and `Gross_Weight` from `opening_tags_entry`
-    const getOpeningTagQuery = `SELECT product_id, tag_id, Gross_Weight FROM opening_tags_entry WHERE opentag_id = ?`;
+    // 🔹 Step 1: Fetch the current `product_id`, `tag_id`, and `Gross_Weight`
+    const getOpeningTagQuery = `
+      SELECT product_id, tag_id, Gross_Weight 
+      FROM opening_tags_entry 
+      WHERE opentag_id = ?
+    `;
     const [result] = await db.execute(getOpeningTagQuery, [id]);
-    
+
     if (result.length === 0) {
       return res.status(404).json({ message: "Record not found" });
     }
 
     const { product_id, tag_id, Gross_Weight: oldGrossWeight } = result[0];
-    const newGrossWeight = updatedData.Gross_Weight;
+    const newGrossWeight = parseFloat(updatedData.Gross_Weight) || 0;
 
-    // Step 2: Update `updated_values_table`
-    const updateValuesQuery = `UPDATE updated_values_table 
+    // 🔹 Step 2: Update related table (`updated_values_table`)
+    const updateValuesQuery = `
+      UPDATE updated_values_table 
       SET bal_gross_weight = bal_gross_weight + ? - ? 
-      WHERE product_id = ? AND tag_id = ?`;
-
+      WHERE product_id = ? AND tag_id = ?
+    `;
     await db.execute(updateValuesQuery, [oldGrossWeight, newGrossWeight, product_id, tag_id]);
 
-    // Step 3: Update `opening_tags_entry` with new values
+    // 🔹 Step 3: Update the main record
     const sql = `UPDATE opening_tags_entry SET ? WHERE opentag_id = ?`;
     const [updateResult] = await db.query(sql, [updatedData, id]);
-    
+
     if (updateResult.affectedRows === 0) {
       return res.status(404).json({ message: "Record not found" });
     }
-    
+
     res.status(200).json({ message: "Data updated successfully" });
+
   } catch (err) {
     console.error("Database error updating opening tag:", err);
     res.status(500).json({ error: "Database update failed", details: err });
@@ -299,7 +319,7 @@ router.delete('/delete/opening-tags-entry/:opentag_id', async (req, res) => {
     // Fetch record to get `tag_id`, `product_id`, and `Gross_Weight`
     const getOpeningTagQuery = `SELECT product_id, tag_id, Gross_Weight FROM opening_tags_entry WHERE opentag_id = ?`;
     const [result] = await db.execute(getOpeningTagQuery, [id]);
-    
+
     if (result.length === 0) {
       return res.status(404).json({ message: "Record not found" });
     }
@@ -322,7 +342,7 @@ router.delete('/delete/opening-tags-entry/:opentag_id', async (req, res) => {
     // Delete from `opening_tags_entry`
     const deleteQuery = `DELETE FROM opening_tags_entry WHERE opentag_id = ?`;
     const [deleteResult] = await db.execute(deleteQuery, [id]);
-    
+
     if (deleteResult.affectedRows === 0) {
       return res.status(404).json({ message: "No record found to delete" });
     }
@@ -338,10 +358,10 @@ router.delete('/delete/opening-tags-entry/:opentag_id', async (req, res) => {
 router.post('/post/subcategory', async (req, res) => {
   try {
     const { category_id, sub_category_name, category, prefix, metal_type, purity, selling_purity, printing_purity } = req.body;
-    
+
     const query = 'INSERT INTO subcategory (category_id, sub_category_name, category, prefix, metal_type, purity, selling_purity, printing_purity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
     const [results] = await db.execute(query, [category_id, sub_category_name, category, prefix, metal_type, purity, selling_purity, printing_purity]);
-    
+
     res.status(201).json({ message: 'Subcategory created successfully', subcategory_id: results.insertId });
   } catch (err) {
     console.error('Error inserting data:', err);
@@ -367,11 +387,11 @@ router.get('/get/subcategory/:id', async (req, res) => {
     const subcategoryId = req.params.id;
     const query = 'SELECT * FROM subcategory WHERE subcategory_id = ?';
     const [results] = await db.execute(query, [subcategoryId]);
-    
+
     if (results.length === 0) {
       return res.status(404).json({ message: 'Subcategory not found' });
     }
-    
+
     res.status(200).json(results[0]);
   } catch (err) {
     console.error('Error fetching data:', err);
