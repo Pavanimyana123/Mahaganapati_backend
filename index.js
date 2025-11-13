@@ -34,6 +34,7 @@ const repairInvoiceRoutes = require('./routes/repairInvoiceRoutes');
 const offerRoutes = require('./routes/offerRoutes');
 const wastageRoutes = require('./routes/wastageRoutes');
 const userRoleRoutes = require('./routes/userRoleRoutes');
+const forgotPasswordRoutes = require('./routes/forgotpassword');
 
 
 const app = express();
@@ -81,6 +82,7 @@ app.use('/', repairInvoiceRoutes);
 app.use('/', offerRoutes);
 app.use('/', wastageRoutes);
 app.use('/', userRoleRoutes);
+app.use('/', forgotPasswordRoutes);
 
 
 // Start the server
