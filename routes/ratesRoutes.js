@@ -28,16 +28,13 @@ router.post('/post/rates', async (req, res) => {
     silver_rate,
   } = req.body;
 
-  // Validate required fields
   if (!rate_date || !rate_time || !rate_16crt || !rate_18crt || !rate_22crt || !rate_24crt || !silver_rate) {
     return res.status(400).json({ error: 'All fields are required' });
   }
 
   try {
-    // Convert rate_time to 24-hour format
     const formattedRateTime = convertTo24HourTime(rate_time);
 
-    // Prepare rate data
     const rateData = [
       rate_date,
       formattedRateTime,
@@ -48,42 +45,43 @@ router.post('/post/rates', async (req, res) => {
       silver_rate
     ];
 
-    // Insert into `rates` table
+    // Save record in history table
     const [insertResult] = await db.query(
       `INSERT INTO rates (rate_date, rate_time, rate_16crt, rate_18crt, rate_22crt, rate_24crt, silver_rate)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       rateData
     );
 
-    // Update `current_rates` table
-    const [updateResult] = await db.query(
-      `UPDATE current_rates
-       SET rate_date = ?, rate_time = ?, rate_16crt = ?, rate_18crt = ?, rate_22crt = ?, rate_24crt = ?, silver_rate = ?
-       WHERE current_rates_id = 1`,
-      rateData
-    );
+    // Check if any row exists in current_rates
+    const [existing] = await db.query(`SELECT current_rates_id FROM current_rates LIMIT 1`);
 
-    // If no rows updated, insert a new record
-    if (updateResult.affectedRows === 0) {
-      const [insertCurrentResult] = await db.query(
+    if (existing.length > 0) {
+      // UPDATE existing row (no ID needed)
+      const [updateResult] = await db.query(
+        `UPDATE current_rates 
+         SET rate_date = ?, rate_time = ?, rate_16crt = ?, rate_18crt = ?, rate_22crt = ?, rate_24crt = ?, silver_rate = ?
+         WHERE current_rates_id = ?`,
+        [...rateData, existing[0].current_rates_id]
+      );
+
+      return res.status(200).json({
+        message: 'Updated existing current rate',
+        ratesInsertId: insertResult.insertId
+      });
+    } else {
+      // INSERT new row
+      const [insertCurrent] = await db.query(
         `INSERT INTO current_rates (rate_date, rate_time, rate_16crt, rate_18crt, rate_22crt, rate_24crt, silver_rate)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         rateData
       );
 
       return res.status(200).json({
-        message: 'Data successfully added to rates and current_rates',
+        message: 'Inserted new current rate',
         ratesInsertId: insertResult.insertId,
-        currentRatesInsertId: insertCurrentResult.insertId,
+        currentRatesInsertId: insertCurrent.insertId
       });
     }
-
-    // If update was successful
-    res.status(200).json({
-      message: 'Data successfully added to rates and updated current_rates',
-      ratesInsertId: insertResult.insertId,
-    });
-
   } catch (error) {
     console.error('Error processing rates:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -91,12 +89,13 @@ router.post('/post/rates', async (req, res) => {
 });
 
 
+
 router.get('/get/current-rates', async (req, res) => {
   try {
-    const [result] = await db.query('SELECT * FROM current_rates WHERE current_rates_id = 1');
+    const [result] = await db.query(`SELECT * FROM current_rates LIMIT 1`);
 
     if (result.length === 0) {
-      return res.status(404).json({ error: 'No data found in current_rates table' });
+      return res.status(404).json({ error: 'No current rates found' });
     }
 
     res.status(200).json(result[0]);
@@ -105,6 +104,7 @@ router.get('/get/current-rates', async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
 
 
 router.get('/get/rates', async (req, res) => {
