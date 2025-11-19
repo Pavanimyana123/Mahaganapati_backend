@@ -9,21 +9,16 @@ router.post('/add/repairs', async (req, res) => {
 
     const sanitizeDecimal = (value, defaultValue = 0) => value === "" || value === null ? defaultValue : value;
 
-    // Check if repair_id or repair_no exists
+    // Check if this should be an INSERT or UPDATE
     let existingRepair = null;
 
+    // Only check for existing repair if repair_id is provided and not empty
     if (data.repair_id) {
       // Check by repair_id
       const checkSql = `SELECT repair_id FROM repairs WHERE repair_id = ?`;
       const [rows] = await db.query(checkSql, [data.repair_id]);
       existingRepair = rows[0];
-    } else if (data.repair_no) {
-      // Check by repair_no
-      const checkSql = `SELECT repair_id FROM repairs WHERE repair_no = ?`;
-      const [rows] = await db.query(checkSql, [data.repair_no]);
-      existingRepair = rows[0];
     }
-
     if (existingRepair) {
       // UPDATE existing record
       const updateSql = `
@@ -51,7 +46,15 @@ router.post('/add/repairs', async (req, res) => {
       res.status(200).json({ message: 'Repair entry updated successfully', repairId: existingRepair.repair_id });
 
     } else {
-      // INSERT new record
+      // INSERT new record - generate new repair_no if needed
+      let repairNo = data.repair_no;
+      
+      // If repair_no is empty or we want to force a new number, generate one
+      if (!repairNo || repairNo.trim() === "") {
+        // Generate new repair_no logic here
+        repairNo = await generateNewRepairNo();
+      }
+
       const insertSql = `
         INSERT INTO repairs (
           customer_id, account_name, mobile, email, address1, address2, address3, city, staff, delivery_date, 
@@ -63,7 +66,7 @@ router.post('/add/repairs', async (req, res) => {
 
       const values = [
         data.customer_id, data.account_name, data.mobile, data.email, data.address1, data.address2, data.address3, data.city,
-        data.staff, data.delivery_date, data.place, data.metal, data.counter, data.entry_type, data.repair_no, data.date,
+        data.staff, data.delivery_date, data.place, data.metal, data.counter, data.entry_type, repairNo, data.date,
         data.metal_type, data.item, data.tag_no, data.description, data.purity, data.category, data.sub_category,
         sanitizeDecimal(data.gross_weight), sanitizeDecimal(data.pcs), sanitizeDecimal(data.estimated_dust), sanitizeDecimal(data.estimated_amt),
         sanitizeDecimal(data.extra_weight), sanitizeDecimal(data.stone_value), sanitizeDecimal(data.making_charge),
@@ -80,6 +83,26 @@ router.post('/add/repairs', async (req, res) => {
     res.status(500).json({ error: 'Failed to process repair' });
   }
 });
+
+// Helper function to generate new repair number
+async function generateNewRepairNo() {
+  // Your logic to generate new repair number
+  // Example: Get the latest repair_no and increment it
+  const getLatestSql = `SELECT repair_no FROM repairs ORDER BY repair_id DESC LIMIT 1`;
+  const [rows] = await db.query(getLatestSql);
+  
+  if (rows.length > 0) {
+    const latestNo = rows[0].repair_no;
+    // Extract number and increment
+    const match = latestNo.match(/(\d+)$/);
+    if (match) {
+      const newNumber = parseInt(match[1]) + 1;
+      return `RPN${newNumber.toString().padStart(3, '0')}`;
+    }
+  }
+  
+  return 'RPN001'; // Default if no records exist
+}
 
 router.get('/get/repairs', async (req, res) => {
   try {
