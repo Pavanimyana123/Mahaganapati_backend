@@ -276,7 +276,7 @@ router.get('/get-repair-invoice-group/:repair_no', async (req, res) => {
       city: saleDetails[0].city,
       date: saleDetails[0].date,
       items: saleDetails.map(item => ({
-        product_name: item.product_name,
+        category: item.category,
         metal_type: item.metal_type,
         gross_weight: item.gross_weight,
         total_price: item.total_price,
