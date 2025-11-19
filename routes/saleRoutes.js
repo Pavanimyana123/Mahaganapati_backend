@@ -248,7 +248,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 const onlineAmount = parseFloat(item.online_amt) || 0;
 
                 const paidAmt = cashAmount + cardAmount + chqAmount + onlineAmount;
-                const netBillAmount = netAmount - (totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
+                const netBillAmount = netAmount - (discountAmt + totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
                 const roundedNetBillAmount = Math.round(netBillAmount);
                 const balAmt = roundedNetBillAmount - paidAmt;
 
@@ -314,7 +314,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                         sanitizeNumeric(item.mc_per_gram),
                         sanitizeNumeric(item.making_charges),
                         sanitizeNumeric(item.disscount_percentage),
-                        sanitizeNumeric(item.disscount),
+                        sanitizeNumeric(discountAmt),
                         sanitizeNumeric(item.festival_discount),
                         sanitizeNumeric(item.rate),
                         sanitizeNumeric(item.rate_24k),
@@ -369,7 +369,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                     const onlineAmount = parseFloat(item.online_amt) || 0;
 
                     const paidAmt = cashAmount + cardAmount + chqAmount + onlineAmount;
-                    const netBillAmount = netAmount - (totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
+                    const netBillAmount = netAmount - (discountAmt + totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
                     const roundedNetBillAmount = Math.round(netBillAmount);
                     const balAmt = roundedNetBillAmount - paidAmt;
 
@@ -419,7 +419,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                         sanitizeNumeric(item.mc_per_gram),
                         sanitizeNumeric(item.making_charges),
                         sanitizeNumeric(item.disscount_percentage),
-                        sanitizeNumeric(item.disscount),
+                        sanitizeNumeric(discountAmt),
                         sanitizeNumeric(item.festival_discount),
                         sanitizeNumeric(item.rate),
                         sanitizeNumeric(item.rate_24k),
@@ -496,7 +496,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 const onlineAmount = parseFloat(item.online_amt) || 0;
 
                 const paidAmt = cashAmount + cardAmount + chqAmount + onlineAmount;
-                const netBillAmount = netAmount - (totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
+                const netBillAmount = netAmount - (discountAmt + totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
                 const roundedNetBillAmount = Math.round(netBillAmount);
                 const balAmt = roundedNetBillAmount - paidAmt;
 
@@ -546,7 +546,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                     sanitizeNumeric(item.mc_per_gram),
                     sanitizeNumeric(item.making_charges),
                     sanitizeNumeric(item.disscount_percentage),
-                    sanitizeNumeric(item.disscount),
+                    sanitizeNumeric(discountAmt),
                     sanitizeNumeric(item.festival_discount),
                     sanitizeNumeric(item.rate),
                     sanitizeNumeric(item.rate_24k),
@@ -873,7 +873,7 @@ router.get("/get-repair-details/:invoice_number", async (req, res) => {
             tax_amount: results[0].tax_amount,
             net_amount: results[0].net_amount,
             invoice: results[0].invoice,
-            disscount_percentage: results[0].disscount_percentage,
+            disscount: results[0].disscount,
         };
 
         const repeatedData = results.map(row => ({
@@ -922,9 +922,9 @@ router.get("/get-repair-details/:invoice_number", async (req, res) => {
             mc_on: row.mc_on,
             mc_per_gram: row.mc_per_gram,
             making_charges: row.making_charges,
-            disscount_percentage: row.disscount_percentage,
-            disscount: row.disscount,
-            festival_discount: row.festival_discount,
+            // disscount_percentage: row.disscount_percentage,
+            // disscount: row.disscount,
+            // festival_discount: row.festival_discount,
             rate: row.rate,
             rate_24k: row.rate_24k,
             pieace_cost: row.pieace_cost,

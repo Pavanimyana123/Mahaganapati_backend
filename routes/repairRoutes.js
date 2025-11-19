@@ -97,7 +97,7 @@ async function generateNewRepairNo() {
     const match = latestNo.match(/(\d+)$/);
     if (match) {
       const newNumber = parseInt(match[1]) + 1;
-      return `RPN${newNumber.toString().padStart(3, '0')}`;
+      return `RP${newNumber.toString().padStart(3, '0')}`;
     }
   }
   
@@ -233,55 +233,55 @@ router.put('/update/repairs/:id', async (req, res) => {
 //   }
 // });
 
-router.delete('/repairs', async (req, res) => {
-  try {
-    const { repair_no } = req.body;
+// router.delete('/repairs', async (req, res) => {
+//   try {
+//     const { repair_no } = req.body;
 
-    // Check if repair_no is provided
-    if (!repair_no) {
-      return res.status(400).json({ error: 'Repair number is required for deletion' });
-    }
+//     // Check if repair_no is provided
+//     if (!repair_no) {
+//       return res.status(400).json({ error: 'Repair number is required for deletion' });
+//     }
 
-    // First, check if the repair exists and get some details for confirmation
-    const checkSql = 'SELECT repair_no, account_name FROM repairs WHERE repair_no = ? LIMIT 1';
-    const [checkResult] = await db.query(checkSql, [repair_no]);
+//     // First, check if the repair exists and get some details for confirmation
+//     const checkSql = 'SELECT repair_no, account_name FROM repairs WHERE repair_no = ? LIMIT 1';
+//     const [checkResult] = await db.query(checkSql, [repair_no]);
 
-    if (checkResult.length === 0) {
-      return res.status(404).json({ error: 'Repair entry not found' });
-    }
+//     if (checkResult.length === 0) {
+//       return res.status(404).json({ error: 'Repair entry not found' });
+//     }
 
-    // Delete all entries with the given repair_no
-    const deleteSql = 'DELETE FROM repairs WHERE repair_no = ?';
-    const [result] = await db.query(deleteSql, [repair_no]);
+//     // Delete all entries with the given repair_no
+//     const deleteSql = 'DELETE FROM repairs WHERE repair_no = ?';
+//     const [result] = await db.query(deleteSql, [repair_no]);
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'No repair entries found to delete' });
-    }
+//     if (result.affectedRows === 0) {
+//       return res.status(404).json({ error: 'No repair entries found to delete' });
+//     }
 
-    res.status(200).json({
-      message: `Successfully deleted ${result.affectedRows} repair entry/entries`,
-      repair_no: repair_no,
-      affectedRows: result.affectedRows
-    });
+//     res.status(200).json({
+//       message: `Successfully deleted ${result.affectedRows} repair entry/entries`,
+//       repair_no: repair_no,
+//       affectedRows: result.affectedRows
+//     });
 
-  } catch (error) {
-    console.error('Error deleting repair:', error);
-    res.status(500).json({ error: 'Failed to delete repair entry' });
-  }
-});
+//   } catch (error) {
+//     console.error('Error deleting repair:', error);
+//     res.status(500).json({ error: 'Failed to delete repair entry' });
+//   }
+// });
 
 router.get('/lastRPNNumber', async (req, res) => {
   try {
-    const [results] = await db.query("SELECT repair_no FROM repairs WHERE repair_no LIKE 'RPN%' ORDER BY repair_no DESC LIMIT 1");
-    let nextRPNNumber = 'RPN001';
+    const [results] = await db.query("SELECT repair_no FROM repairs WHERE repair_no LIKE 'RP%' ORDER BY repair_no DESC LIMIT 1");
+    let nextRPNNumber = 'RP001';
     if (results.length > 0) {
       const lastNumber = parseInt(results[0].repair_no.slice(3), 10);
-      nextRPNNumber = `RPN${String(lastNumber + 1).padStart(3, '0')}`;
+      nextRPNNumber = `RP${String(lastNumber + 1).padStart(3, '0')}`;
     }
     res.status(200).json({ lastRPNNumber: nextRPNNumber });
   } catch (error) {
-    console.error('Error fetching last RPN number:', error);
-    res.status(500).json({ error: 'Failed to fetch last RPN number' });
+    console.error('Error fetching last RP number:', error);
+    res.status(500).json({ error: 'Failed to fetch last RP number' });
   }
 });
 

@@ -699,13 +699,19 @@ router.delete('/repair-details/:invoiceNumber', async (req, res) => {
             }
         }
 
-        // 4️⃣ Delete old_items
+        // 4️⃣ Delete from repairs table where invoice_number matches
+        const [repairDeleteResult] = await connection.execute(
+            'DELETE FROM repairs WHERE invoice_number = ?',
+            [invoiceNumber]
+        );
+
+        // 5️⃣ Delete old_items
         await connection.execute(
             'DELETE FROM old_items WHERE invoice_id = ?',
             [invoiceNumber]
         );
 
-        // 5️⃣ Delete sale_details
+        // 6️⃣ Delete sale_details
         const [deleteResult] = await connection.execute(
             `DELETE FROM sale_details 
        WHERE invoice_number = ? 
@@ -713,7 +719,7 @@ router.delete('/repair-details/:invoiceNumber', async (req, res) => {
             [invoiceNumber]
         );
 
-        // 6️⃣ Delete the PDF file after successful database operations
+        // 7️⃣ Delete the PDF file after successful database operations
         try {
             const pdfPath = path.join(__dirname, '../uploads/invoices', `${invoiceNumber}.pdf`);
             await fs.access(pdfPath); // Check if file exists
@@ -733,7 +739,9 @@ router.delete('/repair-details/:invoiceNumber', async (req, res) => {
 
         res.status(200).json({
             message: 'Sale details deleted successfully',
-            deletedRows: deleteResult.affectedRows
+            deletedSaleRows: deleteResult.affectedRows,
+            deletedRepairRows: repairDeleteResult.affectedRows,
+            totalDeletedRows: deleteResult.affectedRows + repairDeleteResult.affectedRows
         });
 
     } catch (error) {
@@ -752,6 +760,91 @@ router.delete('/repair-details/:invoiceNumber', async (req, res) => {
             connection.release();
         }
     }
+});
+
+
+router.delete('/repairs', async (req, res) => {
+  try {
+    const { repair_no } = req.body;
+
+    // Check if repair_no is provided
+    if (!repair_no) {
+      return res.status(400).json({ error: 'Repair number is required for deletion' });
+    }
+
+    // First, check if the repair exists and get some details for confirmation
+    const checkSql = 'SELECT repair_no, account_name, invoice_number FROM repairs WHERE repair_no = ? LIMIT 1';
+    const [checkResult] = await db.query(checkSql, [repair_no]);
+
+    if (checkResult.length === 0) {
+      return res.status(404).json({ error: 'Repair entry not found' });
+    }
+
+    const invoiceNumber = checkResult[0].invoice_number;
+
+    // Start a transaction to ensure data consistency
+    await db.query('START TRANSACTION');
+
+    try {
+      // Delete from sale_details where order_number matches repair_no
+      const deleteSaleDetailsSql = 'DELETE FROM sale_details WHERE order_number = ?';
+      await db.query(deleteSaleDetailsSql, [repair_no]);
+
+      // Delete from repairs table
+      const deleteRepairsSql = 'DELETE FROM repairs WHERE repair_no = ?';
+      const [result] = await db.query(deleteRepairsSql, [repair_no]);
+
+      if (result.affectedRows === 0) {
+        await db.query('ROLLBACK');
+        return res.status(404).json({ error: 'No repair entries found to delete' });
+      }
+
+      // Commit the transaction
+      await db.query('COMMIT');
+
+      // Delete the invoice PDF file if invoice number exists
+      if (invoiceNumber) {
+        try {
+          const fs = require('fs').promises;
+          const path = require('path');
+          const invoicePath = path.join(__dirname, '../uploads/invoices', `${invoiceNumber}.pdf`);
+          
+          // Check if file exists before deleting
+          try {
+            await fs.access(invoicePath);
+            await fs.unlink(invoicePath);
+            console.log(`Successfully deleted invoice file: ${invoiceNumber}.pdf`);
+          } catch (fileError) {
+            if (fileError.code === 'ENOENT') {
+            //   console.log(`Invoice file not found: ${invoiceNumber}.pdf, skipping deletion`);
+            } else {
+              console.error('Error deleting invoice file:', fileError);
+              // Don't fail the entire request if file deletion fails
+            }
+          }
+        } catch (fileError) {
+          console.error('Error handling invoice file deletion:', fileError);
+          // Continue with the response even if file deletion fails
+        }
+      }
+
+      res.status(200).json({
+        message: `Successfully deleted ${result.affectedRows} repair entry/entries and related data`,
+        repair_no: repair_no,
+        invoice_deleted: !!invoiceNumber,
+        affectedRows: result.affectedRows
+      });
+
+    } catch (error) {
+      // Rollback transaction in case of any error
+      await db.query('ROLLBACK');
+      throw error;
+    }
+
+  } catch (error) {
+    console.error('Error deleting repair:', error);
+    res.status(500).json({ error: 'Failed to delete repair entry' });
+  }
 });
 
 
