@@ -248,7 +248,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 const onlineAmount = parseFloat(item.online_amt) || 0;
 
                 const paidAmt = cashAmount + cardAmount + chqAmount + onlineAmount;
-                const netBillAmount = netAmount - (totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
+                const netBillAmount = netAmount - (totalOldAmount);
                 const roundedNetBillAmount = Math.round(netBillAmount);
                 const balAmt = roundedNetBillAmount - paidAmt;
 
@@ -288,7 +288,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                         currentTime,
                         item.code || null,
                         item.product_id || null,
-                        item.opentag_id || null,
+                        item.opentag_id || "0",
                         item.metal || null,
                         item.product_name || null,
                         item.metal_type || null,
@@ -369,7 +369,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                     const onlineAmount = parseFloat(item.online_amt) || 0;
 
                     const paidAmt = cashAmount + cardAmount + chqAmount + onlineAmount;
-                    const netBillAmount = netAmount - (totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
+                    const netBillAmount = netAmount - (totalOldAmount);
                     const roundedNetBillAmount = Math.round(netBillAmount);
                     const balAmt = roundedNetBillAmount - paidAmt;
 
@@ -393,7 +393,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                         newInvoiceNumber,
                         item.code || null,
                         item.product_id || null,
-                        item.opentag_id || null,
+                        item.opentag_id || "0",
                         item.metal || null,
                         item.product_name || null,
                         item.metal_type || null,
@@ -496,7 +496,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                 const onlineAmount = parseFloat(item.online_amt) || 0;
 
                 const paidAmt = cashAmount + cardAmount + chqAmount + onlineAmount;
-                const netBillAmount = netAmount - (totalOldAmount + schemesTotalAmount + parsedSalesNetAmount);
+                const netBillAmount = netAmount - (totalOldAmount);
                 const roundedNetBillAmount = Math.round(netBillAmount);
                 const balAmt = roundedNetBillAmount - paidAmt;
 
@@ -520,7 +520,7 @@ router.post("/save-repair-details", upload.array("product_image", 10), async (re
                     newInvoiceNumber,
                     item.code,
                     item.product_id,
-                    item.opentag_id,
+                    sanitizeNumeric(item.opentag_id),
                     item.metal,
                     item.product_name,
                     item.metal_type,
@@ -873,7 +873,7 @@ router.get("/get-repair-details/:invoice_number", async (req, res) => {
             tax_amount: results[0].tax_amount,
             net_amount: results[0].net_amount,
             invoice: results[0].invoice,
-            disscount_percentage: results[0].disscount_percentage,
+            disscount: results[0].disscount,
         };
 
         const repeatedData = results.map(row => ({
@@ -924,7 +924,7 @@ router.get("/get-repair-details/:invoice_number", async (req, res) => {
             making_charges: row.making_charges,
             disscount_percentage: row.disscount_percentage,
             disscount: row.disscount,
-            festival_discount: row.festival_discount,
+            // festival_discount: row.festival_discount,
             rate: row.rate,
             rate_24k: row.rate_24k,
             pieace_cost: row.pieace_cost,

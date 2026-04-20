@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const moment = require('moment');
 const db = require("../db");
+const fs = require("fs");
+const path = require("path");
 
 
 // Helper function to sanitize values
@@ -316,15 +318,20 @@ router.delete('/delete/opening-tags-entry/:opentag_id', async (req, res) => {
       return res.status(400).json({ error: "Invalid ID received" });
     }
 
-    // Fetch record to get `tag_id`, `product_id`, and `Gross_Weight`
-    const getOpeningTagQuery = `SELECT product_id, tag_id, Gross_Weight FROM opening_tags_entry WHERE opentag_id = ?`;
+    // Fetch record to get product_id, tag_id, Gross_Weight, and Barcode
+    const getOpeningTagQuery = `
+      SELECT product_id, tag_id, Gross_Weight, PCode_BarCode 
+      FROM opening_tags_entry 
+      WHERE opentag_id = ?
+    `;
     const [result] = await db.execute(getOpeningTagQuery, [id]);
 
     if (result.length === 0) {
       return res.status(404).json({ message: "Record not found" });
     }
 
-    const { product_id, tag_id, Gross_Weight } = result[0];
+    const { product_id, tag_id, Gross_Weight, PCode_BarCode } = result[0];
+
     const formattedTagId = typeof tag_id === "number" ? tag_id.toString() : tag_id;
     const formattedProductId = parseInt(product_id, 10);
 
@@ -332,14 +339,37 @@ router.delete('/delete/opening-tags-entry/:opentag_id', async (req, res) => {
       return res.status(400).json({ error: "Invalid product_id" });
     }
 
-    // Update `updated_values_table`
-    const updateValuesQuery = `UPDATE updated_values_table 
-      SET bal_gross_weight = bal_gross_weight + ?, bal_pcs = bal_pcs + 1 
-      WHERE product_id = ? AND tag_id = CAST(? AS CHAR)`;
+    // ==============================
+    // 1️⃣ DELETE PDF FILE IF EXISTS
+    // ==============================
 
+    if (PCode_BarCode) {
+      const filePath = path.join(__dirname, "../uploads/invoices", `${PCode_BarCode}.pdf`);
+
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          console.log("PDF delete error (file may not exist):", filePath);
+        } else {
+          // console.log("PDF deleted:", filePath);
+        }
+      });
+    }
+
+    // ==============================
+    // 2️⃣ UPDATE updated_values_table
+    // ==============================
+
+    const updateValuesQuery = `
+      UPDATE updated_values_table 
+      SET bal_gross_weight = bal_gross_weight + ?, bal_pcs = bal_pcs + 1 
+      WHERE product_id = ? AND tag_id = CAST(? AS CHAR)
+    `;
     await db.execute(updateValuesQuery, [Gross_Weight, formattedProductId, formattedTagId]);
 
-    // Delete from `opening_tags_entry`
+    // ==============================
+    // 3️⃣ DELETE FROM opening_tags_entry
+    // ==============================
+
     const deleteQuery = `DELETE FROM opening_tags_entry WHERE opentag_id = ?`;
     const [deleteResult] = await db.execute(deleteQuery, [id]);
 
@@ -348,6 +378,7 @@ router.delete('/delete/opening-tags-entry/:opentag_id', async (req, res) => {
     }
 
     res.status(200).json({ message: "Opening tag deleted successfully" });
+
   } catch (err) {
     console.error("Database error:", err);
     res.status(500).json({ error: "Database error while deleting opening tag", details: err });
